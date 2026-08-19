@@ -169,12 +169,26 @@ hiesse, für 300 Zeilen Algorithmus einen unbekannten Codepfad in eine App zu
 lassen, deren Versprechen die kurze Abhängigkeitsliste ist.
 
 ⚠️ Die zwei grossen Tabellen (Blockaufteilung, Ausrichtungsmuster) sind
-abgeschrieben und damit die wahrscheinlichste Fehlerquelle. Sie prüfen sich
-**gegenseitig**: `tests/qr.test.ts` rechnet die Gesamtzahl der Codewörter
-geometrisch aus Symbolgrösse und Funktionsmustern — und die Ausrichtungsmuster
-gehen in diese Rechnung ein. Ein Zahlendreher in einer der beiden bringt sie zum
-Platzen, für alle 40 Versionen × 4 Stufen. Zusätzlich liest `npm run qr` die
-erzeugten Codes mit Chromes `BarcodeDetector` zurück.
+abgeschrieben und damit die wahrscheinlichste Fehlerquelle. **Zwei Prüfungen
+decken sie ab, und zwar verschiedene Fehler** — an Mutationen gemessen:
+
+| Fehler | `qr.test.ts` (geometrisch) | `npm run qr` (Decoder) |
+|---|---|---|
+| Zahlendreher in der Blocktabelle | **fängt ihn** | fängt ihn |
+| verschobenes Ausrichtungsmuster | **grün!** | fängt ihn |
+
+Der geometrische Test kennt nur die ANZAHL der Ausrichtungsmuster, nicht ihre
+Lage: verschiebt man einen Punkt, bleibt die Codewortzahl gleich. Die eine
+Prüfung ersetzt die andere also nicht. Ich hatte das zunächst stärker behauptet,
+als es stimmt — erst die Mutationsprobe hat es gezeigt.
+
+⚠️ `BarcodeDetector` gibt es nur auf macOS und Android; unter Linux (CI) fehlt
+er. Deshalb läuft **jsQR** als plattformunabhängiger Zweitdecoder mit, und der
+Bericht sagt, welche Decoder tatsächlich gelaufen sind — ein still
+übersprungener Test wäre wertlos. Und: eine gleichförmige Nutzlast
+(`'x'.repeat(n)`) bringt Apples Decoder bei Version 38 und 40 zum Aufgeben,
+jsQR liest dieselben Symbole einwandfrei. Das Testmaterial ist deshalb
+abwechslungsreich — so wie die base64-Nutzlasten, die klartext wirklich kodiert.
 
 ## Der Fingerprint reist NICHT im Einladungslink mit
 

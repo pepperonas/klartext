@@ -8,12 +8,21 @@
  * lassen, deren Werbeversprechen die kurze Abhängigkeitsliste ist.
  *
  * ⚠️ Die beiden grossen Tabellen (Blockaufteilung und Ausrichtungsmuster) sind
- *    abgeschrieben und damit die wahrscheinlichste Fehlerquelle. Deshalb prüfen
- *    sie sich gegenseitig: `tests/qr.test.ts` rechnet die Gesamtzahl der
- *    Codewörter GEOMETRISCH aus der Symbolgrösse und den Funktionsmustern aus
- *    und vergleicht sie mit der Blocktabelle. Ein Zahlendreher in einer der
- *    beiden fällt dabei sofort auf. Zusätzlich liest der Browsertest die
- *    erzeugten Codes mit `BarcodeDetector` wieder ein.
+ *    abgeschrieben und damit die wahrscheinlichste Fehlerquelle. Zwei Prüfungen
+ *    decken sie ab, und zwar UNTERSCHIEDLICHE Fehler — an Mutationen gemessen:
+ *
+ *      · `tests/qr.test.ts` rechnet die Gesamtzahl der Codewörter GEOMETRISCH
+ *        aus Symbolgrösse und Funktionsmustern und vergleicht sie mit der
+ *        Blocktabelle — erschöpfend über alle 40 Versionen × 4 Stufen. Fängt
+ *        jeden Zahlendreher in der Blocktabelle.
+ *
+ *      · `tools/e2e/qr.mjs` lässt zwei fremde Decoder (jsQR und, wo vorhanden,
+ *        Chromes `BarcodeDetector`) die erzeugten Bilder zurücklesen. NUR das
+ *        fängt eine verschobene AUSRICHTUNGSMUSTER-Position: die geometrische
+ *        Rechnung kennt deren Anzahl, aber nicht ihre Lage — verschiebt man
+ *        einen Punkt, bleibt die Codewortzahl gleich und der Unit-Test grün.
+ *
+ *    Die eine Prüfung ersetzt die andere also nicht.
  */
 
 export type Fehlerkorrektur = 'L' | 'M' | 'Q' | 'H';

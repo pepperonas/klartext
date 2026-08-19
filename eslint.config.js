@@ -51,7 +51,7 @@ export default tseslint.config(
         document: 'readonly', globalThis: 'readonly', navigator: 'readonly',
         location: 'readonly', WebSocket: 'readonly', EventSource: 'readonly',
         getComputedStyle: 'readonly', btoa: 'readonly', atob: 'readonly',
-        OffscreenCanvas: 'readonly',
+        OffscreenCanvas: 'readonly', TextEncoder: 'readonly', TextDecoder: 'readonly',
         window: 'readonly',
       },
     },
