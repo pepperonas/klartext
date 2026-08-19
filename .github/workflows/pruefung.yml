@@ -52,6 +52,15 @@ jobs:
       - name: Nichts verlässt den Browser
         run: npm run e2e
 
+      # Kein Zustand ohne Ausweg, kein Knopf ohne Wirkung. Dieser Lauf hat
+      # schon zwei Attrappen gefunden, die keine andere Prüfung sah.
+      - name: Wegfindung
+        run: npm run wege
+
+      # Phase 2 gilt als erfüllt, wenn die App im Flugmodus arbeitet.
+      - name: Offline-Betrieb
+        run: npm run offline
+
       - name: Zugänglichkeit
         run: npm run a11y
 
