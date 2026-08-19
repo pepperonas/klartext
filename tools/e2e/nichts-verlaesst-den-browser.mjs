@@ -45,10 +45,13 @@ function starteServer() {
       .then((inhalt) => {
         res.writeHead(200, {
           'Content-Type': TYPEN[extname(datei)] ?? 'application/octet-stream',
+          // Wortgleich mit dem, was nginx in Produktion sendet (deploy/nginx-klartext.conf).
+          // Wenn die App das hier ueberlebt, ueberlebt sie es auch dort.
           'Content-Security-Policy':
             "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; " +
             "font-src 'self'; img-src 'self'; connect-src 'self'; worker-src 'self'; " +
-            "manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'",
+            "manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; " +
+            "object-src 'none'; require-trusted-types-for 'script'; trusted-types klartext-worker",
           'Referrer-Policy': 'no-referrer',
           'X-Content-Type-Options': 'nosniff',
         });

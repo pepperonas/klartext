@@ -56,3 +56,16 @@ describe('Fingerprint-Darstellung', () => {
     expect(gruppiert.split(' ')).toHaveLength(10);
   });
 });
+
+describe('Verfahrensnamen im UI', () => {
+  // Die internen Bezeichner von OpenPGP.js ("ed25519Legacy") sind korrekt, aber
+  // keine Sprache, die man einem Menschen zeigt. Auf der Live-Seite stand das
+  // eine Runde lang so da.
+  it('kennt keine internen OID-Namen mehr im ausgelieferten Bundle-Text', async () => {
+    const { readFileSync: lese } = await import('node:fs');
+    const quelle = lese(new URL('../src/ui/views/schluessel.ts', import.meta.url), 'utf8');
+    // Der Bezeichner darf nur noch als Schluessel der Uebersetzungstabelle
+    // vorkommen, nicht als Wert, der ins DOM wandert.
+    expect(quelle).toMatch(/ed25519Legacy:\s*'Curve25519'/);
+  });
+});

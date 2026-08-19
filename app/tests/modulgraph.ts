@@ -16,6 +16,15 @@ export interface GraphErgebnis {
   readonly dateien: readonly string[];
   /** Alle Paketnamen, die von dort aus erreichbar sind. */
   readonly pakete: readonly string[];
+  /**
+   * Verweise mit Vite-Suffix (`?worker&url`, `?url`, `?raw`, `?inline`).
+   *
+   * ⚠️ Solche Verweise ziehen KEINEN Code herein — `?worker&url` liefert eine
+   *    URL-Zeichenkette auf einen eigenstaendigen Chunk. Wer ihnen wie einem
+   *    gewoehnlichen Import folgt, meldet faelschlich, der Main-Thread erreiche
+   *    die Kryptobibliothek. Sie werden deshalb hier gefuehrt statt verfolgt.
+   */
+  readonly assets: readonly string[];
 }
 
 /**
@@ -25,6 +34,7 @@ export interface GraphErgebnis {
 export function laufeGraph(einstieg: string): GraphErgebnis {
   const gesehen = new Set<string>();
   const pakete = new Set<string>();
+  const assets = new Set<string>();
   const offen = [resolve(einstieg)];
 
   while (offen.length > 0) {
@@ -39,13 +49,23 @@ export function laufeGraph(einstieg: string): GraphErgebnis {
       while ((treffer = regex.exec(quelle)) !== null) {
         const spezifizierer = treffer[1];
         if (spezifizierer === undefined) continue;
-        if (spezifizierer.startsWith('.')) {
-          offen.push(resolve(dirname(datei), spezifizierer));
+
+        const [pfad, abfrage] = spezifizierer.split('?');
+        if (pfad === undefined) continue;
+
+        // Asset-Verweis statt Code-Import: nicht verfolgen, aber festhalten.
+        if (abfrage !== undefined && /\b(worker|url|raw|inline)\b/.test(abfrage)) {
+          assets.add(spezifizierer);
+          continue;
+        }
+
+        if (pfad.startsWith('.')) {
+          offen.push(resolve(dirname(datei), pfad));
         } else {
-          pakete.add(spezifizierer.split('/')[0] ?? spezifizierer);
+          pakete.add(pfad.split('/')[0] ?? pfad);
         }
       }
     }
   }
-  return { dateien: [...gesehen], pakete: [...pakete] };
+  return { dateien: [...gesehen], pakete: [...pakete], assets: [...assets] };
 }

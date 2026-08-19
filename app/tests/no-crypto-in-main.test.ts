@@ -23,6 +23,13 @@ describe('Quelltext', () => {
     expect(pakete).not.toContain('openpgp');
   });
 
+  it('der Client kennt den Worker nur als Adresse, nicht als Code', () => {
+    // `?worker&url` liefert eine URL-Zeichenkette auf einen eigenen Chunk.
+    // Genau so — und nur so — bleibt die Krypto aus dem Haupt-Bundle heraus.
+    const { assets } = laufeGraph(join(SRC, 'crypto', 'client.ts'));
+    expect(assets).toContain('../worker/index.ts?worker&url');
+  });
+
   it('der Vertrag erreicht openpgp nicht — auch nicht als Typ', () => {
     const { pakete } = laufeGraph(join(SRC, 'crypto', 'protocol.ts'));
     expect(pakete).not.toContain('openpgp');
@@ -101,6 +108,25 @@ describe.runIf(DIST_DA)('gebauter Bundle', () => {
     expect(mitKrypto.length).toBeGreaterThan(0);
     for (const datei of mitKrypto) {
       expect(datei).toMatch(/worker|krypto/i);
+    }
+  });
+
+  /**
+   * ⚠️ Vite bettet einen Worker als base64-`data:`-URL in den Haupt-Bundle ein,
+   *    sobald sein Import nicht mehr dem woertlichen Muster entspricht. Der
+   *    Chunk verschwindet dann — und mit ihm die Zusicherung, dass die Krypto
+   *    woanders liegt. Aufgefallen ist das erst, als die scharfe CSP den
+   *    data:-Worker ablehnte; die Marker- und Groessenpruefung allein hat es
+   *    NICHT bemerkt.
+   */
+  it('der Worker ist ein eigener Chunk und steckt nicht als data:-URL im Bundle', () => {
+    const dateien = jsDateien(DIST);
+    const workerChunks = dateien.filter((f) => /worker|krypto/i.test(f));
+    expect(workerChunks.length).toBeGreaterThan(0);
+
+    for (const datei of dateien.filter((f) => !/worker|krypto/i.test(f))) {
+      const inhalt = readFileSync(datei, 'utf8');
+      expect(inhalt).not.toMatch(/data:(?:video\/mp2t|text\/javascript|application\/javascript);base64/);
     }
   });
 

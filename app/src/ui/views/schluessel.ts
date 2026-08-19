@@ -14,6 +14,30 @@ function gruppiere(fingerprint: string): string {
   return (fingerprint.match(/.{1,4}/g) ?? []).join(' ');
 }
 
+/**
+ * Interne Bezeichner von OpenPGP.js in etwas uebersetzen, das man einem
+ * Menschen zeigen kann. "ed25519Legacy" ist der OID-Name des v4-Verfahrens —
+ * korrekt, aber im UI eine Zumutung.
+ */
+function verfahrenName(algorithmus: string, bits: number | null, kurve: string | null): string {
+  if (bits !== null) return `RSA-${String(bits)}`;
+  const kurven: Readonly<Record<string, string>> = {
+    ed25519Legacy: 'Curve25519',
+    curve25519Legacy: 'Curve25519',
+    ed25519: 'Curve25519',
+    curve25519: 'Curve25519',
+    nistP256: 'NIST P-256',
+    nistP384: 'NIST P-384',
+    nistP521: 'NIST P-521',
+    brainpoolP256r1: 'Brainpool P-256',
+    brainpoolP384r1: 'Brainpool P-384',
+    brainpoolP512r1: 'Brainpool P-512',
+    secp256k1: 'secp256k1',
+  };
+  if (kurve !== null) return kurven[kurve] ?? kurve;
+  return algorithmus;
+}
+
 function karte(...kinder: (Node | string | false | null)[]): HTMLElement {
   return el('section', { class: 'karte' }, ...kinder);
 }
@@ -199,7 +223,7 @@ export class SchluesselAnsicht {
   }
 
   #schluesselkarte(schluessel: KeyInfo): HTMLElement {
-    const beschreibung = schluessel.bits !== null ? `RSA-${String(schluessel.bits)}` : (schluessel.curve ?? schluessel.algorithm);
+    const beschreibung = verfahrenName(schluessel.algorithm, schluessel.bits, schluessel.curve);
     return karte(
       el(
         'div',
