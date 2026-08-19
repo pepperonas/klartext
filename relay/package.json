@@ -1,0 +1,7 @@
+{
+  "name": "@klartext/relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-Knowledge-Briefkasten. Wird in Phase 4 gebaut."
+}

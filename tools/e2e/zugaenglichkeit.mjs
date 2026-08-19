@@ -1,0 +1,119 @@
+/**
+ * Zugaenglichkeitspruefung mit axe-core gegen den GEBAUTEN Stand.
+ *
+ * Warum nicht Lighthouse, obwohl der Plan es nennt: Lighthouse zieht ~292 MB
+ * Abhaengigkeiten mit — darunter @sentry/node — und `npm audit` meldete dafuer
+ * 20 Schwachstellen (4 davon hoch). In einem Projekt, dessen Zusage "keine
+ * Telemetrie, keine fremden Dienste" lautet, ist das die falsche Abhaengigkeit,
+ * selbst als reines Entwicklungswerkzeug.
+ *
+ * axe-core ist die Engine, auf der Lighthouses Zugaenglichkeits-Kategorie
+ * ohnehin beruht, hat NULL Abhaengigkeiten — und die Latte hier liegt hoeher
+ * als Lighthouses "≥ 95": null Verstoesse gegen WCAG 2.1 A und AA.
+ *
+ * Gegenprobe zum Zeitpunkt der Umstellung: Lighthouse meldete auf demselben
+ * Stand 100/100.
+ *
+ * Aufruf: node tools/e2e/zugaenglichkeit.mjs
+ */
+
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { chromium } from 'playwright';
+
+const require = createRequire(import.meta.url);
+const AXE_QUELLE = await readFile(require.resolve('axe-core'), 'utf8');
+
+const HIER = dirname(fileURLToPath(import.meta.url));
+const DIST = join(HIER, '..', '..', 'app', 'dist');
+const REGELN = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+
+const TYPEN = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+};
+
+const server = createServer((req, res) => {
+  const pfad = normalize(decodeURIComponent((req.url ?? '/').split('?')[0]));
+  const datei = pfad === '/' ? 'index.html' : pfad.replace(/^\/+/, '');
+  readFile(join(DIST, datei))
+    .then((inhalt) => {
+      res.writeHead(200, { 'Content-Type': TYPEN[extname(datei)] ?? 'application/octet-stream' });
+      res.end(inhalt);
+    })
+    .catch(() => { res.writeHead(404); res.end('nicht gefunden'); });
+});
+await new Promise((r) => { server.listen(0, '127.0.0.1', r); });
+const basis = `http://127.0.0.1:${server.address().port}/`;
+
+const browser = await chromium.launch({ headless: true });
+
+/** Prueft einen Zustand der App in beiden Themen. */
+async function pruefe(name, vorbereiten) {
+  const ergebnisse = [];
+  for (const thema of ['dunkel', 'hell']) {
+    const seite = await browser.newPage();
+    await seite.goto(basis, { waitUntil: 'networkidle' });
+    await seite.evaluate((t) => { document.documentElement.dataset.theme = t; }, thema);
+    await vorbereiten(seite);
+    await seite.addScriptTag({ content: AXE_QUELLE });
+    const bericht = await seite.evaluate(
+      (regeln) => globalThis.axe.run(document, { runOnly: { type: 'tag', values: regeln } }),
+      REGELN,
+    );
+    ergebnisse.push({ zustand: `${name} / ${thema}`, verstoesse: bericht.violations });
+    await seite.close();
+  }
+  return ergebnisse;
+}
+
+const alle = [
+  ...(await pruefe('leerer Schlüsselbund', async () => { await new Promise((r) => setTimeout(r, 300)); })),
+  ...(await pruefe('Schlüssel angelegt', async (seite) => {
+    await seite.waitForSelector('#name');
+    await seite.fill('#name', 'Prüfperson');
+    await seite.fill('#email', 'pruef@klartext.invalid');
+    await seite.selectOption('#algo', 'curve25519');
+    await seite.fill('#pw', 'eine-lange-passphrase');
+    await seite.fill('#pw2', 'eine-lange-passphrase');
+    await seite.click('button[type=submit]');
+    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
+    await seite.click('button.haupt');
+    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+  })),
+  ...(await pruefe('gesperrt', async (seite) => {
+    await seite.waitForSelector('#name');
+    await seite.fill('#name', 'Prüfperson');
+    await seite.fill('#email', 'pruef@klartext.invalid');
+    await seite.selectOption('#algo', 'curve25519');
+    await seite.fill('#pw', 'eine-lange-passphrase');
+    await seite.fill('#pw2', 'eine-lange-passphrase');
+    await seite.click('button[type=submit]');
+    await seite.waitForSelector('button.haupt', { timeout: 60_000 });
+    await seite.click('button.haupt');
+    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+    await seite.click('.kopf-knoepfe button');
+    await seite.waitForSelector('#pw');
+  })),
+];
+
+await browser.close();
+server.close();
+
+let gesamt = 0;
+for (const { zustand, verstoesse } of alle) {
+  gesamt += verstoesse.length;
+  console.log(`${verstoesse.length === 0 ? '  OK  ' : '  ROT '} ${zustand}`);
+  for (const v of verstoesse) {
+    console.log(`        ${v.id} (${v.impact}): ${v.help}`);
+    for (const k of v.nodes.slice(0, 3)) console.log(`          ${k.target.join(' ')}`);
+  }
+}
+console.log(`\nWCAG 2.1 A + AA über ${alle.length} Zustände: ${gesamt} Verstöße\n`);
+process.exit(gesamt === 0 ? 0 : 1);

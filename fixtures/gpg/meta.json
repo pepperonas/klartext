@@ -1,0 +1,8 @@
+{
+  "erzeugtMit": "gpg (GnuPG) 2.5.21",
+  "passphrase": "klartext-fixture-passphrase",
+  "hinweis": "WEGWERF-TESTSCHLUESSEL. Passphrase absichtlich oeffentlich. Nie fuer echte Kommunikation verwenden.",
+  "rsa": { "fingerprint": "C669A5B0078E577AF1F2D6BB91D5C9D319201E38", "userId": "Klartext RSA Fixture <rsa@fixture.klartext.invalid>" },
+  "ecc": { "fingerprint": "2790F3667FC489F37A973D278E682ABB08962004", "userId": "Klartext ECC Fixture <ecc@fixture.klartext.invalid>" },
+  "klartext": "Hallo aus GnuPG.\nZeile zwei mit Umlauten: Grueezi, Aepfel, weisse Woelfe.\n"
+}

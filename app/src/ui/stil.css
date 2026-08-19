@@ -1,0 +1,201 @@
+/* Alle Farben und Masse kommen aus src/design/tokens.ts (virtual:tokens.css). */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--kt-bg);
+  color: var(--kt-text);
+  font-family: var(--kt-schrift-text);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--kt-breite);
+  margin: 0 auto;
+  padding: 0 var(--kt-raum-4);
+}
+
+/* Sprungmarke: erst sichtbar, wenn sie den Fokus hat. */
+.sprungmarke {
+  position: absolute;
+  left: -9999px;
+  top: var(--kt-raum-2);
+  background: var(--kt-akzent);
+  color: var(--kt-auf-akzent);
+  padding: var(--kt-raum-3) var(--kt-raum-4);
+  border-radius: var(--kt-r-klein);
+  z-index: 10;
+}
+.sprungmarke:focus { left: var(--kt-raum-4); }
+
+/* ------------------------------------------------------------------ Kopf */
+
+.kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--kt-raum-4);
+  flex-wrap: wrap;
+  padding: var(--kt-raum-4) 0;
+  border-bottom: 1px solid var(--kt-kontur);
+}
+
+.wortmarke {
+  font-family: var(--kt-schrift-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--kt-text);
+  text-decoration: none;
+}
+.wortmarke:hover { color: var(--kt-akzent); }
+
+.kopf-knoepfe { margin-left: auto; display: flex; gap: var(--kt-raum-2); }
+
+/* -------------------------------------------------------------- Sperrkerbe */
+
+.kerbe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kt-raum-2);
+  padding: var(--kt-raum-1) var(--kt-raum-3);
+  border: 1px solid var(--kt-kontur);
+  border-radius: var(--kt-r-voll);
+  font-size: 0.85rem;
+  color: var(--kt-text-leise);
+}
+.kerbe-punkt {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--kt-text-still);
+  flex: none;
+}
+.kerbe[data-zustand='unlocked'] { border-color: var(--kt-akzent); color: var(--kt-text); }
+.kerbe[data-zustand='unlocked'] .kerbe-punkt { background: var(--kt-akzent); }
+.kerbe[data-zustand='locked'] .kerbe-punkt { background: var(--kt-warnung); }
+.kerbe-rest { font-variant-numeric: tabular-nums; color: var(--kt-text-still); }
+
+/* ----------------------------------------------------------------- Haupt */
+
+.haupt { flex: 1; padding: var(--kt-raum-6) 0; }
+.ansicht { display: flex; flex-direction: column; gap: var(--kt-raum-4); }
+.ansicht-titel { margin: 0; font-size: 1.4rem; }
+
+.karte {
+  background: var(--kt-flaeche);
+  border: 1px solid var(--kt-kontur);
+  border-radius: var(--kt-r-gross);
+  padding: var(--kt-raum-5);
+}
+.karte h2, .karte h3 { margin: 0 0 var(--kt-raum-3); font-size: 1.15rem; }
+
+.kopfzeile { display: flex; align-items: center; gap: var(--kt-raum-3); flex-wrap: wrap; }
+.kopfzeile h3 { margin: 0; }
+
+.form { display: flex; flex-direction: column; gap: var(--kt-raum-4); }
+.feld { display: flex; flex-direction: column; gap: var(--kt-raum-1); }
+.feld label { font-size: 0.9rem; color: var(--kt-text-leise); }
+
+input, select, textarea {
+  font: inherit;
+  /* 16px verhindert, dass iOS beim Fokus hineinzoomt. */
+  font-size: 16px;
+  color: var(--kt-text);
+  background: var(--kt-bg-erhaben);
+  border: 1px solid var(--kt-kontur-stark);
+  border-radius: var(--kt-r-klein);
+  padding: var(--kt-raum-3);
+  width: 100%;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+.knopf:focus-visible, a:focus-visible {
+  outline: 2px solid var(--kt-akzent);
+  outline-offset: 2px;
+}
+
+.block, .fingerprint { font-family: var(--kt-schrift-mono); }
+.block { resize: vertical; font-size: 0.82rem; line-height: 1.5; }
+
+.fingerprint {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  margin: 0 0 var(--kt-raum-2);
+}
+
+.hinweis { margin: 0; font-size: 0.88rem; color: var(--kt-text-leise); }
+
+.knopfreihe { display: flex; gap: var(--kt-raum-2); flex-wrap: wrap; margin-top: var(--kt-raum-4); }
+
+.knopf {
+  font: inherit;
+  font-size: 0.92rem;
+  /* 44px Mindesthoehe: Fingerkuppen sind kein Mauszeiger. */
+  min-height: 44px;
+  padding: 0 var(--kt-raum-4);
+  border-radius: var(--kt-r-voll);
+  border: 1px solid var(--kt-kontur-stark);
+  background: transparent;
+  color: var(--kt-text);
+  cursor: pointer;
+}
+.knopf:hover { background: var(--kt-flaeche-hoch); }
+.knopf.haupt { background: var(--kt-akzent); color: var(--kt-auf-akzent); border-color: transparent; font-weight: 600; }
+.knopf.haupt:hover { filter: brightness(1.08); }
+.knopf.still { border-color: transparent; color: var(--kt-text-leise); }
+.knopf.still:hover { color: var(--kt-text); background: var(--kt-flaeche-hoch); }
+.knopf[disabled] { opacity: 0.55; cursor: default; }
+
+.pille {
+  font-size: 0.75rem;
+  padding: 2px var(--kt-raum-3);
+  border-radius: var(--kt-r-voll);
+  background: var(--kt-akzent-schwach);
+  color: var(--kt-akzent);
+}
+.pille.gefahr { background: var(--kt-gefahr-schwach); color: var(--kt-gefahr); }
+
+.meldung { margin: 0; font-size: 0.92rem; min-height: 1.5em; }
+.meldung[data-art='gefahr'] { color: var(--kt-gefahr); }
+.meldung[data-art='warnung'] { color: var(--kt-warnung); }
+.meldung[data-art='gut'] { color: var(--kt-gut); }
+.meldung[data-art='neutral'] { color: var(--kt-text-leise); }
+
+/* ------------------------------------------------------------------ Fuss */
+
+.fuss {
+  border-top: 1px solid var(--kt-kontur);
+  padding: var(--kt-raum-5) 0;
+  font-size: 0.85rem;
+  color: var(--kt-text-still);
+}
+.fuss p { margin: 0; }
+.fuss a { color: inherit; }
+
+/* --------------------------------------------------- Themawechsel-Aufblende */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ⚠️ Nur waehrend des eigenen Wechsels, sonst verloere ein kuenftiger
+     Seitenuebergang seinen Standard-Fade. */
+  .thema-wechsel::view-transition-old(root),
+  .thema-wechsel::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  .thema-wechsel::view-transition-image-pair(root) { isolation: auto; }
+  .thema-wechsel::view-transition-old(root) { z-index: 1; }
+  .thema-wechsel::view-transition-new(root) {
+    z-index: 2;
+    animation: kt-aufblende 520ms cubic-bezier(0.2, 0, 0, 1);
+  }
+}
+
+@keyframes kt-aufblende {
+  from { clip-path: circle(0 at var(--kt-reveal-x) var(--kt-reveal-y)); }
+  to   { clip-path: circle(var(--kt-reveal-r) at var(--kt-reveal-x) var(--kt-reveal-y)); }
+}

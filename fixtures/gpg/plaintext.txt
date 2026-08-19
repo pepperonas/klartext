@@ -1,0 +1,2 @@
+Hallo aus GnuPG.
+Zeile zwei mit Umlauten: Grueezi, Aepfel, weisse Woelfe.

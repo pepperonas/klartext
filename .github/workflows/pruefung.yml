@@ -1,0 +1,78 @@
+name: Prüfung
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19'
+          cache: npm
+
+      # `npm ci` schlägt fehl, wenn package-lock.json und package.json
+      # auseinanderlaufen — das ist der Lockfile-Check.
+      - run: npm ci
+
+      - name: Abhängigkeiten prüfen
+        run: npm audit --audit-level=high
+
+      - run: npm run lint
+      - run: npm run typecheck
+
+      - name: gpg-Version festhalten
+        run: gpg --version | head -1
+
+      # KLARTEXT_GPG=1 lässt die Interop-Tests NICHT still überspringen, wenn
+      # gpg fehlt — sie schlagen dann fehl. Eine grün-blinde Suite wäre
+      # schlimmer als eine rote.
+      - name: Tests
+        run: npm test
+        env:
+          KLARTEXT_GPG: '1'
+
+      - run: npm run build
+
+      # Erst nach dem Bauen: dieser Lauf schließt die Prüfung des fertigen
+      # Bundles ein (openpgp darf nur im Worker-Chunk stecken).
+      - name: Bundle-Prüfung
+        run: npm test
+        env:
+          KLARTEXT_GPG: '1'
+          KLARTEXT_DIST: '1'
+
+      - name: Browser holen
+        run: npx playwright install --with-deps chromium
+
+      - name: Nichts verlässt den Browser
+        run: npm run e2e
+
+      - name: Zugänglichkeit
+        run: npm run a11y
+
+  reproduzierbar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19'
+          cache: npm
+      - run: npm ci
+
+      # Zweimal bauen, Prüfsummen vergleichen. Wer den Build-Hash im UI
+      # nachrechnen können soll, braucht einen Build, der zweimal dasselbe
+      # ergibt.
+      - name: Zweimal bauen und vergleichen
+        run: |
+          npm run build
+          find app/dist -type f -exec sha256sum {} + | sed 's|app/dist/||' | sort > /tmp/lauf1.txt
+          rm -rf app/dist
+          npm run build
+          find app/dist -type f -exec sha256sum {} + | sed 's|app/dist/||' | sort > /tmp/lauf2.txt
+          diff /tmp/lauf1.txt /tmp/lauf2.txt && echo "Build ist reproduzierbar."
