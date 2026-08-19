@@ -61,6 +61,10 @@ jobs:
       - name: Offline-Betrieb
         run: npm run offline
 
+      # Liest die selbst erzeugten QR-Codes mit Chromes Decoder zurück.
+      - name: QR-Codes
+        run: npm run qr
+
       - name: Zugänglichkeit
         run: npm run a11y
 
