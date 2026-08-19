@@ -554,8 +554,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .hinweiskasten strong { font-size: 0.98rem; }
 .hinweiskasten .hinweis { color: var(--kt-text); }
 
-/* Eine Option, die zu einem Knopf daneben gehört — kleiner als eine
-   eigenständige Zeile, damit sie den Knopf nicht überstimmt. */
+/* Was zur Handlung gehört, aber kein Knopf ist: Optionen und Sperrgründe.
+   Eine eigene Spalte UNTER der Knopfreihe. */
+.aktions-zusatz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-1);
+  margin-top: var(--kt-raum-2);
+}
+.aktions-zusatz:empty { display: none; }
+
 .nebenwahl {
   display: flex;
   align-items: center;
@@ -564,8 +572,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
   color: var(--kt-text-leise);
   /* Die Trefferfläche bleibt bei 44 px, auch wenn die Schrift kleiner ist. */
   min-height: 44px;
+  cursor: pointer;
 }
-.nebenwahl input { flex: 0 0 auto; }
+/* ⚠️ Ohne feste Grösse bläst das globale `input { width: 100% }` das Kästchen
+   auf die volle Zeilenbreite auf und drängt die Beschriftung in eine schmale
+   Spalte am Rand — genau so gesehen. `flex: none` allein genügt NICHT. */
+.nebenwahl input { width: 20px; height: 20px; flex: none; accent-color: var(--kt-akzent); }
 
 /* Eine Wahl, die gerade nicht getroffen werden kann — sichtbar, damit man
    weiss, dass es sie gibt, aber erkennbar ausser Betrieb. */

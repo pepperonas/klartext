@@ -45,6 +45,16 @@ export class WerkzeugAnsicht {
   });
   #erkanntZeile = el('p', { class: 'erkannt', role: 'status', 'aria-live': 'polite' });
   #aktionen = el('div', { class: 'knopfreihe' });
+  /**
+   * Was zu den Knöpfen gehört, aber kein Knopf ist: Optionen und Sperrgründe.
+   *
+   * ⚠️ Beides stand vorher IN der Knopfreihe. Die ist ein `flex`-Container, und
+   *    das globale `input { width: 100% }` blies das Kästchen darin auf volle
+   *    Breite auf, während die Beschriftung in eine schmale Spalte am Rand
+   *    umbrach. Optionen sind keine Knöpfe und gehören darum darunter, nicht
+   *    dazwischen.
+   */
+  #aktionsZusatz = el('div', { class: 'aktions-zusatz' });
   #ergebnisKarte = el('section', { class: 'karte', hidden: true });
   #meldung = el('p', { class: 'meldung', role: 'status', 'aria-live': 'polite' });
   #empfaengerKarte = el('section', { class: 'karte' });
@@ -98,10 +108,19 @@ export class WerkzeugAnsicht {
           el('label', { for: 'wz-eingabe', text: 'Text oder eingefügter Block' }),
           this.#eingabe),
         this.#erkanntZeile,
-        this.#aktionen),
+        this.#aktionen,
+        this.#aktionsZusatz),
+      // ⚠️ Die Ergebniskarte stand hier zuletzt in der Liste — hinter „An wen?"
+      //    und „Dateien". Das war keine Entscheidung, sondern die Stelle, an
+      //    der eine nachträglich hinzugefügte Karte landet. Die Folge: zwischen
+      //    dem, was man hineingibt, und dem, was herauskommt, lagen 730 px von
+      //    zwei Karten, die Eingaben für die NÄCHSTE Handlung sind. Die App
+      //    scrollte zwar selbst hin (gemessen 598 px, mobil 1067 px), aber die
+      //    Zuordnung Eingabe → Ausgabe musste man sich merken statt sie zu
+      //    sehen. Jetzt steht das Ergebnis unmittelbar unter seiner Eingabe.
+      this.#ergebnisKarte,
       this.#empfaengerKarte,
       this.#dateiKarte(),
-      this.#ergebnisKarte,
       this.#meldung,
     );
     this.#zeichneEmpfaenger();
@@ -177,6 +196,7 @@ export class WerkzeugAnsicht {
     const e = this.#erkennung;
     ersetze(this.#erkanntZeile);
     ersetze(this.#aktionen);
+    ersetze(this.#aktionsZusatz);
     if (e === null) return;
 
     this.#erkanntZeile.dataset['art'] = e.art;
@@ -200,7 +220,7 @@ export class WerkzeugAnsicht {
         //    eine Fachfrage; als zwei gleich laute Knöpfe verlangte er eine
         //    Entscheidung von Leuten, die die Begriffe nicht kennen.
         this.#aktion('Signieren', () => { void this.#signierenJetzt(this.#abgetrennt); }, '', warum);
-        if (warum === null) this.#aktionen.appendChild(this.#abgetrenntWahl());
+        if (warum === null) this.#aktionsZusatz.appendChild(this.#abgetrenntWahl());
         break;
       case 'nachricht':
         this.#aktion('Entschlüsseln', () => { void this.#entschluesseln(); }, 'haupt',
@@ -239,20 +259,23 @@ export class WerkzeugAnsicht {
     haken.checked = this.#abgetrennt;
     haken.addEventListener('change', () => { this.#abgetrennt = haken.checked; });
     return el('label', { class: 'nebenwahl' }, haken,
-      el('span', { text: 'abgetrennt — die Signatur kommt als eigener Block, der Text bleibt unverändert' }));
+      el('span', { text: 'Signatur abgetrennt — sie kommt als eigener Block, der Text bleibt unverändert' }));
   }
 
   #aktion(text: string, beiKlick: () => void, klasse: string, gesperrtWeil: string | null): void {
     const knopf = el('button', { class: `knopf ${klasse}`.trim(), type: 'button', text });
-    if (gesperrtWeil !== null) {
-      knopf.disabled = true;
-      knopf.title = gesperrtWeil;
-      this.#aktionen.appendChild(knopf);
-      this.#aktionen.appendChild(el('span', { class: 'hinweis leise', text: gesperrtWeil }));
+    this.#aktionen.appendChild(knopf);
+    if (gesperrtWeil === null) {
+      knopf.addEventListener('click', beiKlick);
       return;
     }
-    knopf.addEventListener('click', beiKlick);
-    this.#aktionen.appendChild(knopf);
+    knopf.disabled = true;
+    // ⚠️ Der Grund steht UNTER der Reihe und nennt seinen Knopf beim Namen.
+    //    Zwischen den Knöpfen eingeschoben war bei zwei gesperrten Knöpfen
+    //    nicht mehr zu sehen, welcher Grund zu welchem gehört.
+    this.#aktionsZusatz.appendChild(el('p', { class: 'hinweis leise' },
+      el('strong', { text: `${text}: ` }),
+      document.createTextNode(gesperrtWeil)));
   }
 
   // ---------------------------------------------------------- Empfänger

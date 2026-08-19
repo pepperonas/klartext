@@ -103,10 +103,14 @@ pruefe('Verschlüsseln ist freigeschaltet',
   'der Knopf ist gesperrt');
 
 // ⚠️ Die Gegenprobe: was einen EIGENEN Schlüssel braucht, muss gesperrt bleiben.
+// ⚠️ Der Grund steht seit dem Layout-Fix UNTER der Knopfreihe (`.aktions-zusatz`)
+//    und nennt seinen Knopf beim Namen — vorher war er zwischen die Knöpfe
+//    geschoben und bei zwei Gründen nicht mehr zuzuordnen.
+const zusatz = await seite.locator('.aktions-zusatz').innerText().catch(() => '');
 pruefe('Signieren bleibt gesperrt — mit dem richtigen Grund',
   await seite.locator('button:has-text("Signieren")[disabled]').count() > 0
-  && (await seite.locator('.knopfreihe:has-text("Verschlüsseln")').innerText()).includes('eigenen Schlüssel'),
-  `Beschriftung: ${await seite.locator('.knopfreihe:has-text("Verschlüsseln")').innerText().catch(() => '—')}`);
+  && /Signieren:.*eigenen Schlüssel/s.test(zusatz),
+  `Zusatzbereich: ${zusatz || '—'}`);
 
 await seite.click('button:has-text("Verschlüsseln")');
 // ⚠️ NICHT über `textContent` des Ergebnisfeldes lesen. Die Zerfalls-Animation
