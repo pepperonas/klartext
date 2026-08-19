@@ -109,6 +109,98 @@ export interface Ops {
   'keys.setDefault': { req: { fingerprint: string }; res: readonly KeyInfo[] };
   'keys.revocationCertificate': { req: { fingerprint: string }; res: { armored: string } };
   'keys.applyRevocation': { req: { armored: string }; res: KeyInfo };
+
+  /** Was ist das? Grundlage dafür, dass die Oberfläche nicht raten muss. */
+  'tool.erkenne': { req: { eingabe: string }; res: Erkennung };
+
+  'tool.verschluessele': {
+    req: {
+      klartext: string;
+      /** Eigene Schlüssel aus dem Bund. */
+      anFingerprints: readonly string[];
+      /** Zusätzlich eingefügte fremde öffentliche Schlüssel (armored). */
+      anArmored: readonly string[];
+      /** Fingerprint des eigenen Schlüssels zum Signieren, oder null. */
+      signiereMit: string | null;
+    };
+    res: { armored: string };
+  };
+
+  'tool.entschluessele': {
+    req: { armored: string; pruefeMit: readonly string[] };
+    res: EntschluesseltesErgebnis;
+  };
+
+  'tool.signiere': {
+    req: { text: string; fingerprint: string; abgetrennt: boolean };
+    res: { armored: string };
+  };
+
+  'tool.pruefe': {
+    req: { text: string; signatur: string | null; schluessel: readonly string[] };
+    res: { signaturen: readonly SignaturBefund[]; klartext: string | null };
+  };
+
+  'datei.verschluessele': {
+    req: {
+      datei: File;
+      anFingerprints: readonly string[];
+      anArmored: readonly string[];
+      signiereMit: string | null;
+    };
+    res: { daten: Uint8Array; dateiname: string };
+  };
+
+  'datei.entschluessele': {
+    req: { datei: File; pruefeMit: readonly string[] };
+    res: DateiErgebnis;
+  };
+}
+
+/** Was in einem eingefügten Block steckt — Grundlage der Werkzeug-Ansicht. */
+export type BlockArt =
+  | 'nachricht'          // -----BEGIN PGP MESSAGE-----
+  | 'signierter-text'    // -----BEGIN PGP SIGNED MESSAGE-----
+  | 'signatur'           // -----BEGIN PGP SIGNATURE----- (abgetrennt)
+  | 'oeffentlicher-key'
+  | 'privater-key'
+  | 'klartext';          // gar kein OpenPGP
+
+export interface Erkennung {
+  readonly art: BlockArt;
+  /** Kurzbeschreibung im Klartext, direkt anzeigbar. */
+  readonly beschreibung: string;
+  /** Bei Schlüsseln: Fingerprint und Benutzerkennungen. */
+  readonly fingerprint: string | null;
+  readonly userIds: readonly string[];
+  /** Bei Nachrichten: an wen sie verschlüsselt wurde (Key-IDs, hex). */
+  readonly empfaenger: readonly string[];
+  /** true, wenn wir für mindestens einen Empfänger den Schlüssel haben. */
+  readonly fuerUns: boolean;
+}
+
+export type SignaturZustand = 'gueltig' | 'ungueltig' | 'unbekannter-schluessel';
+
+export interface SignaturBefund {
+  readonly keyId: string;
+  readonly zustand: SignaturZustand;
+  /** Benutzerkennung des Unterzeichners, falls bekannt. */
+  readonly wer: string | null;
+  readonly fingerprint: string | null;
+  readonly zeitpunkt: string | null;
+}
+
+export interface EntschluesseltesErgebnis {
+  readonly klartext: string;
+  readonly signaturen: readonly SignaturBefund[];
+  /** Dateiname aus dem Literal-Paket, falls gesetzt. */
+  readonly dateiname: string | null;
+}
+
+export interface DateiErgebnis {
+  readonly daten: Uint8Array;
+  readonly dateiname: string;
+  readonly signaturen: readonly SignaturBefund[];
 }
 
 export type Op = keyof Ops;

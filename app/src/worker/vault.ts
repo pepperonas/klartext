@@ -12,7 +12,7 @@
  *     wir uns selbst ausgedacht haetten.
  */
 
-import type { PrivateKey } from 'openpgp';
+import type { Key, PrivateKey, PublicKey } from 'openpgp';
 
 import { KlartextError } from '../crypto/errors.ts';
 import type {
@@ -370,5 +370,45 @@ export class Vault {
 
   async #speichere(zeile: GespeicherterSchluessel): Promise<void> {
     await idb.schreibe(this.#datenbank, idb.STORE_KEYS, zeile);
+  }
+
+  // ------------------------------------------------------- fürs Werkzeug
+
+  /** Alle eigenen öffentlichen Schlüssel — auch bei gesperrtem Bund lesbar. */
+  async oeffentliche(): Promise<PublicKey[]> {
+    const zeilen = await this.#alleGespeicherten();
+    const keys: PublicKey[] = [];
+    for (const zeile of zeilen) keys.push(await leseOeffentlich(zeile.armoredPublic));
+    return keys;
+  }
+
+  /** Öffentliche Schlüssel zu bestimmten Fingerprints aus dem eigenen Bund. */
+  async oeffentlicheZu(fingerprints: readonly string[]): Promise<PublicKey[]> {
+    const gesucht = new Set(fingerprints.map(normalisiereFingerprint));
+    const zeilen = await this.#alleGespeicherten();
+    const keys: PublicKey[] = [];
+    for (const zeile of zeilen) {
+      if (gesucht.has(zeile.fingerprint)) keys.push(await leseOeffentlich(zeile.armoredPublic));
+    }
+    if (keys.length !== gesucht.size) throw new KlartextError('KEY_NOT_FOUND');
+    return keys;
+  }
+
+  /** Alle entsperrten privaten Schlüssel — zum Entschlüsseln. */
+  entsperrteSchluessel(): PrivateKey[] {
+    this.#fordereEntsperrt();
+    return [...this.#entsperrt.values()];
+  }
+
+  /** Einer davon, zum Signieren. */
+  zumSignieren(fingerprint: string): PrivateKey {
+    return this.#privaterSchluessel(fingerprint);
+  }
+
+  /** Prüfschlüssel: die eigenen plus zusätzlich eingefügte. */
+  async pruefSchluessel(zusaetzlich: readonly string[]): Promise<Key[]> {
+    const eigene: Key[] = await this.oeffentliche();
+    for (const armored of zusaetzlich) eigene.push(await leseOeffentlich(armored));
+    return eigene;
   }
 }

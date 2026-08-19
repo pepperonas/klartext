@@ -158,6 +158,33 @@ l = await lage();
 pruefe('I · Schlüssel vorhanden', l, wegeHeraus(l));
 const mahntOhneBackup = (await seite.locator('.warnkasten.mahnung').count()) > 0;
 
+// Werkzeug — der Bereich aus Phase 2.
+await seite.click('.nav-eintrag:has-text("Werkzeug")');
+await seite.waitForSelector('#wz-eingabe');
+l = await lage();
+pruefe('K · Werkzeug, leer', l, wegeHeraus(l));
+
+await seite.fill('#wz-eingabe', 'Ein Satz zum Verschlüsseln.');
+await seite.waitForSelector('.erkannt-marke:has-text("Klartext")', { timeout: 10_000 });
+l = await lage();
+pruefe('L · Werkzeug, Klartext erkannt', l, wegeHeraus(l));
+const bietetVerschluesseln = l.knoepfe.some((k) => /^Verschlüsseln$/.test(k));
+
+await seite.click('button:has-text("Verschlüsseln")');
+await seite.waitForSelector('h3:has-text("Verschlüsselt")', { timeout: 30_000 });
+await seite.waitForTimeout(600);
+l = await lage();
+pruefe('M · Werkzeug, Ergebnis', l, wegeHeraus(l));
+
+await seite.click('button:has-text("Ins Eingabefeld übernehmen")');
+await seite.waitForSelector('.erkannt-marke:has-text("Verschlüsselt")', { timeout: 10_000 });
+l = await lage();
+pruefe('N · Werkzeug, Nachricht erkannt', l, wegeHeraus(l));
+const bietetEntschluesseln = l.knoepfe.some((k) => /^Entschlüsseln$/.test(k));
+
+await seite.click('.nav-eintrag:has-text("Schlüssel")');
+await seite.waitForSelector('.fingerprint');
+
 // DER Zustand, um den es ging.
 await seite.click('.kopf-knoepfe button:has-text("Sperren")');
 await seite.waitForSelector('#pw');
@@ -173,6 +200,8 @@ server.close();
 // ------------------------------------------------------------------ Bericht
 
 const zusatz = [
+  ['Werkzeug bietet bei Klartext das Verschlüsseln an', bietetVerschluesseln],
+  ['Werkzeug bietet bei einer Nachricht das Entschlüsseln an', bietetEntschluesseln],
   ['„Sperren" fehlt im leeren Schlüsselbund', !sperrenImLeeren],
   ['„Sperren" fehlt, wenn schon gesperrt', !sperrenImGesperrten],
   ['Browser-Zurück führt aus der Info heraus', infoPfad === '/info' && nachZurueck === '/'],

@@ -2,6 +2,7 @@ import 'virtual:tokens.css';
 import './ui/stil.css';
 
 import { CryptoClient } from './crypto/client.ts';
+import { erlaube, vertraue } from './trusted.ts';
 import type { VaultStatus } from './crypto/protocol.ts';
 import { el, suche } from './ui/dom.ts';
 import { Navigation } from './ui/nav.ts';
@@ -11,6 +12,7 @@ import { AnlegenAblauf } from './ui/views/anlegen.ts';
 import { ExportAnsicht } from './ui/views/export.ts';
 import { infoAnsicht } from './ui/views/info.ts';
 import { SchluesselAnsicht } from './ui/views/schluessel.ts';
+import { WerkzeugAnsicht } from './ui/views/werkzeug.ts';
 
 const client = CryptoClient.erzeuge();
 const router = new Router();
@@ -24,6 +26,11 @@ const schluessel = new SchluesselAnsicht({
   beiAnlegen: () => { ablauf = null; router.gehe({ ziel: 'neu', schritt: 1 }); },
   beiExport: (fingerprint) => { router.gehe({ ziel: 'export', kurz: fingerprint.slice(-16) }); },
   beiInfo: () => { router.gehe({ ziel: 'info' }); },
+});
+
+const werkzeug = new WerkzeugAnsicht({
+  client,
+  beiEntsperren: () => { router.gehe({ ziel: 'schluessel' }); },
 });
 
 const exportAnsicht = new ExportAnsicht({
@@ -129,6 +136,12 @@ async function zeige(weg: Weg): Promise<void> {
 
   if (weg.ziel === 'info') { setzeInhalt(infoAnsicht()); return; }
 
+  if (weg.ziel === 'werkzeug') {
+    setzeInhalt(werkzeug.wurzel);
+    await werkzeug.zeichne(status);
+    return;
+  }
+
   // Anlegen und Exportieren setzen einen entsperrten (bzw. leeren) Bund voraus.
   if (weg.ziel === 'neu') {
     if (status.state === 'locked') { router.ersetze({ ziel: 'schluessel' }); return; }
@@ -179,3 +192,23 @@ async function starte(): Promise<void> {
 }
 
 void starte();
+
+/**
+ * Service Worker anmelden — dafür, dass Modus A auch im Flugmodus läuft.
+ *
+ * Bewusst NACH dem Start und ohne Warten: die App funktioniert auch ohne ihn,
+ * und ein Fehler hier darf sie nicht aufhalten.
+ */
+const SW_URL = erlaube('/sw.js');
+
+if ('serviceWorker' in navigator) {
+  globalThis.addEventListener('load', () => {
+    // ⚠️ `register()` ist ebenfalls eine TrustedScriptURL-Senke. Ohne die
+    //    Richtlinie blockiert die CSP die Anmeldung STILL — die App läuft
+    //    weiter, nur der Flugmodus funktioniert nie. Gefunden allein dadurch,
+    //    dass der Datenabfluss-Test die Browser-Konsole mitliest.
+    void navigator.serviceWorker.register(vertraue(SW_URL), { scope: '/' }).catch(() => {
+      // Ohne Service Worker fehlt nur der Offline-Betrieb — kein Grund zur Aufregung.
+    });
+  });
+}

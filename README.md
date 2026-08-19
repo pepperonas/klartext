@@ -16,13 +16,16 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 ## Stand
 
-**Phase 1 von 5 ist fertig** — der Krypto-Kern. Schlüssel erzeugen, ein
-Schlüsselbund mit Passphrase-Schutz und Zeitsperre, Import und Export in beide
-Richtungen zu GnuPG, Widerrufszertifikate. Läuft unter
-[klartext.celox.io](https://klartext.celox.io/).
+**Phase 1 und 2 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
+Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
 
-Werkzeug-Modus, Kontakte, Relay und die Auslieferung folgen; die Phasen stehen
-in [`PLAN.md`](PLAN.md).
+* **Schlüssel** — erzeugen, Schlüsselbund mit Passphrase-Schutz und Zeitsperre,
+  Import und Export in beide Richtungen zu GnuPG, Widerrufszertifikate
+* **Werkzeug** — Text und Dateien ver- und entschlüsseln, signieren, prüfen;
+  offline-fähig als installierbare App
+
+Kontakte, Relay und die Härtung folgen; die Phasen stehen in
+[`PLAN.md`](PLAN.md), der Benutzbarkeits-Plan in [`PLAN-UX.md`](PLAN-UX.md).
 
 ## Zwei Betriebsarten
 
@@ -34,6 +37,17 @@ Mail, Matrix. Braucht keinen Server und keine Verbindung.
 Briefkasten, der nur Ciphertext sieht. Das ist **Bequemlichkeit, kein
 Sicherheitsgewinn**, und die App sagt das an der Stelle, an der man es
 einschaltet.
+
+## Das Werkzeug erkennt, statt zu fragen
+
+Keine Reiter, bei denen man vorher wissen müsste, was man tut. Ein Feld: du fügst
+etwas ein, klartext sagt dir, was es ist — verschlüsselte Nachricht, signierter
+Text, abgetrennte Signatur, öffentlicher oder privater Schlüssel — und bietet an,
+was damit geht.
+
+Signaturen kennen dabei **drei** Zustände, nicht zwei: *gültig*, *ungültig* und
+*Unterzeichner unbekannt*. Das dritte als „ungültig" darzustellen wäre eine
+Falschaussage — ohne den Schlüssel des Unterzeichners lässt sich nichts sagen.
 
 ## Passphrasen, die man sich merken kann
 
@@ -104,15 +118,20 @@ Voraussetzung: Node ≥ 20.19.
 
 ```bash
 npm run pruefe       # lint + typecheck + Tests
-npm run test:alles   # dazu Browserlauf und Zugänglichkeit
+npm run test:alles   # dazu alle vier Browserläufe
 ```
 
 | Was | Umfang |
 |---|---|
-| Tests | 135, davon 18 gegen **echtes GnuPG** |
-| Datenabfluss | 17 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
-| Wegfindung | 21 Kriterien: kein Zustand ohne Ausweg, kein Knopf ohne Wirkung |
-| Zugänglichkeit | WCAG 2.1 A + AA, 16 Zustände (8 Ansichten × 2 Themen), 0 Verstöße |
+| Unit-Tests | **296** in 22 Dateien, davon 33 gegen **echtes GnuPG** |
+| Datenabfluss | 19 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
+| Wegfindung | 27 Kriterien: kein Zustand ohne Ausweg, kein Knopf ohne Wirkung |
+| Offline | 6 Kriterien — Schlüssel erzeugen und Nachrichten austauschen **ohne Netz** |
+| Zugänglichkeit | WCAG 2.1 A + AA, 18 Zustände (9 Ansichten × 2 Themen), 0 Verstöße |
+
+Jede Zusicherung, die etwas verbietet, wurde einmal **mutiert** und beim
+Scheitern beobachtet — ein Test, den man nicht hat rot werden sehen, ist keine
+Zusicherung.
 
 Die GPG-Testvektoren liegen unter `fixtures/gpg/` und stammen aus echtem GnuPG,
 nicht aus OpenPGP.js — ein Interop-Test gegen die eigene Bibliothek beweist
@@ -120,6 +139,15 @@ nichts. Neu erzeugen mit `npm run fixtures` (braucht `gpg`).
 
 > ⚠️ Die privaten Schlüssel in `fixtures/` sind Wegwerf-Testschlüssel mit
 > öffentlich bekannter Passphrase. Nie für echte Kommunikation verwenden.
+
+## Offline
+
+klartext ist eine installierbare App und arbeitet **vollständig ohne Netz** —
+Schlüssel erzeugen, verschlüsseln, entschlüsseln, signieren, prüfen. Es gibt
+nichts zu fragen: die ganze Rechnung passiert ohnehin in deinem Browser.
+
+Ein eigener Testlauf kappt die Verbindung und prüft genau das
+(`npm run offline`).
 
 ## Abhängigkeiten
 

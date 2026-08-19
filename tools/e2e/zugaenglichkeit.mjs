@@ -144,6 +144,16 @@ const alle = [
     await seite.click('button:has-text("Passwort vorschlagen")');
     await seite.waitForSelector('.passwort-vorschlag');
   })),
+  ...(await pruefe('Werkzeug mit Ergebnis', async (seite) => {
+    await bisSchluessel(seite);
+    await seite.click('.nav-eintrag:has-text("Werkzeug")');
+    await seite.waitForSelector('#wz-eingabe');
+    await seite.fill('#wz-eingabe', 'Ein Satz für die Prüfung.');
+    await seite.waitForSelector('.erkannt-marke', { timeout: 10_000 });
+    await seite.click('button:has-text("Verschlüsseln")');
+    await seite.waitForSelector('h3:has-text("Verschlüsselt")', { timeout: 30_000 });
+    await seite.waitForTimeout(600);
+  })),
   ...(await pruefe('gesperrt', async (seite) => {
     await bisSchluessel(seite);
     await seite.click('.kopf-knoepfe button:has-text("Sperren")');

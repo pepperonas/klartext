@@ -518,3 +518,81 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
   padding: var(--kt-raum-2) 0;
 }
 .fuss-link:hover { color: var(--kt-akzent); }
+
+/* --------------------------------------------------------- Zerfall-Motiv */
+
+.zf { display: inline-block; white-space: pre; will-change: transform, opacity; }
+.zf-rest { white-space: pre-wrap; }
+
+/* ----------------------------------------------------------- Werkzeug */
+
+.gross-feld { min-height: 180px; }
+
+.erkannt {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kt-raum-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--kt-text-leise);
+}
+.erkannt-marke {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px var(--kt-raum-3);
+  border-radius: var(--kt-r-voll);
+  background: var(--kt-flaeche-hoch);
+  color: var(--kt-text);
+  flex: none;
+}
+.erkannt[data-art='nachricht'] .erkannt-marke,
+.erkannt[data-art='signatur'] .erkannt-marke { background: var(--kt-akzent-schwach); color: var(--kt-akzent); }
+.erkannt[data-art='privater-key'] .erkannt-marke { background: var(--kt-gefahr-schwach); color: var(--kt-gefahr); }
+.erkannt[data-art='signierter-text'] .erkannt-marke { background: var(--kt-gut-schwach); color: var(--kt-gut); }
+.erkannt-fp { font-family: var(--kt-schrift-mono); font-size: 0.8rem; color: var(--kt-text-still); }
+
+.empfaenger {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kt-raum-3);
+  padding: var(--kt-raum-2) 0;
+  font-size: 0.94rem;
+  cursor: pointer;
+}
+.empfaenger input { width: 20px; height: 20px; flex: none; margin-top: 2px; accent-color: var(--kt-akzent); }
+
+/* Das Ergebnis in Festbreitenschrift: es ist Material, kein Fließtext. */
+.ergebnis {
+  font-family: var(--kt-schrift-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  padding: var(--kt-raum-4);
+  border-radius: var(--kt-r-klein);
+  background: var(--kt-bg-erhaben);
+  border: 1px solid var(--kt-kontur);
+  max-height: 420px;
+  overflow: auto;
+}
+
+.ablage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kt-raum-2);
+  min-height: 120px;
+  padding: var(--kt-raum-5);
+  border: 2px dashed var(--kt-kontur-stark);
+  border-radius: var(--kt-r-mittel);
+  cursor: pointer;
+  text-align: center;
+}
+.ablage:hover, .ablage:focus-visible { border-color: var(--kt-akzent); background: var(--kt-flaeche-hoch); }
+.ablage.bereit { border-color: var(--kt-akzent); background: var(--kt-akzent-schwach); }
+.ablage p { margin: 0; }
+.weg { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

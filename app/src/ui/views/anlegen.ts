@@ -370,6 +370,11 @@ export class AnlegenAblauf {
 
     const weiter = el('button', { class: 'knopf haupt', type: 'button', text: 'Schlüssel jetzt erzeugen' });
     weiter.disabled = true;
+    // ⚠️ Der Handler MUSS hier hängen, vor jedem frühen return. Stand er am Ende
+    //    der Funktion, war der Knopf im Zweig „selbst getippt" eine Attrappe —
+    //    dieselbe Falle wie beim Widerrufs-Schritt. Gefunden vom Offline-Test,
+    //    weil der als einziger die selbst getippte Passphrase durchspielt.
+    weiter.addEventListener('click', () => { void this.#erzeuge(weiter, meldung); });
 
     const inhalt = el('div', { class: 'schritt-inhalt' });
 
@@ -501,7 +506,6 @@ export class AnlegenAblauf {
       this.#fuss('Zurück', weiter),
     );
 
-    weiter.addEventListener('click', () => { void this.#erzeuge(weiter, meldung); });
     return inhalt;
   }
 

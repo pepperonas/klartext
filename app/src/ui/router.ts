@@ -15,6 +15,7 @@ export type Weg =
   | { readonly ziel: 'schluessel' }
   | { readonly ziel: 'neu'; readonly schritt: number }
   | { readonly ziel: 'export'; readonly kurz: string }
+  | { readonly ziel: 'werkzeug' }
   | { readonly ziel: 'info' };
 
 export const START: Weg = { ziel: 'schluessel' };
@@ -24,6 +25,7 @@ export function alsPfad(weg: Weg): string {
     case 'schluessel': return '/';
     case 'neu': return `/neu/${String(weg.schritt)}`;
     case 'export': return `/export/${weg.kurz}`;
+    case 'werkzeug': return '/werkzeug';
     case 'info': return '/info';
   }
 }
@@ -33,6 +35,7 @@ export function ausPfad(pfad: string): Weg {
   const [erstes, zweites] = teile;
 
   if (erstes === 'info') return { ziel: 'info' };
+  if (erstes === 'werkzeug') return { ziel: 'werkzeug' };
   if (erstes === 'neu') {
     const schritt = Number(zweites ?? '1');
     return { ziel: 'neu', schritt: Number.isInteger(schritt) && schritt > 0 ? schritt : 1 };

@@ -27,6 +27,7 @@ const MARKER = {
   name: 'Marker Person',
   email: 'marker@klartext.invalid',
   exportPassphrase: 'EXPORT-MARKER-b2d8e05f',
+  klartext: 'KLARTEXT-MARKER-3e91d0aa geheime Nachricht',
 };
 
 const TYPEN = {
@@ -179,6 +180,25 @@ await seite.waitForSelector('.fingerprint', { timeout: 30_000 });
 const fingerprint = (await seite.textContent('.fingerprint'))?.trim() ?? '';
 const kerbeOffen = (await seite.textContent('.kerbe'))?.trim() ?? '';
 
+// ---- Werkzeug: der Klartext darf nirgends auftauchen ---------------------
+await seite.click('.nav-eintrag:has-text("Werkzeug")');
+await seite.waitForSelector('#wz-eingabe');
+await seite.fill('#wz-eingabe', MARKER.klartext);
+await seite.waitForSelector('.erkannt-marke:has-text("Klartext")', { timeout: 10_000 });
+await seite.click('button:has-text("Verschlüsseln")');
+await seite.waitForSelector('h3:has-text("Verschlüsselt")', { timeout: 30_000 });
+await seite.waitForTimeout(600);
+const ciphertext = (await seite.textContent('.ergebnis')) ?? '';
+await seite.click('button:has-text("Ins Eingabefeld übernehmen")');
+await seite.waitForSelector('.erkannt-marke:has-text("Verschlüsselt")', { timeout: 10_000 });
+await seite.click('button:has-text("Entschlüsseln")');
+await seite.waitForSelector('h3:has-text("Entschlüsselt")', { timeout: 30_000 });
+await seite.waitForTimeout(600);
+const wiederhergestellt = (await seite.textContent('.ergebnis')) ?? '';
+
+await seite.click('.nav-eintrag:has-text("Schlüssel")');
+await seite.waitForSelector('.fingerprint');
+
 await seite.click('.kopf-knoepfe button:has-text("Sperren")');
 await seite.waitForSelector('#pw', { timeout: 10_000 });
 const kerbeZu = (await seite.textContent('.kerbe'))?.trim() ?? '';
@@ -229,6 +249,8 @@ const pruefungen = [
   ['keine Fehler in der Konsole', konsole.filter((z) => z.startsWith('error')).length === 0],
   ['ausschließlich Anfragen an die eigene Herkunft', !verstoesse.some((v) => v.startsWith('Fremde'))],
   ['kein Ausgang über sendBeacon/WebSocket/EventSource', ausgang.length === 0],
+  ['Rundlauf im Werkzeug erhält den Text', wiederhergestellt.trim() === MARKER.klartext],
+  ['der Ciphertext ist ein Armored-Block', ciphertext.includes('BEGIN PGP MESSAGE')],
   ['nichts Geheimes in irgendeiner Anfrage', verstoesse.length === 0],
 ];
 
@@ -239,6 +261,11 @@ let alleGut = true;
 for (const [was, gut] of pruefungen) {
   console.log(`${gut ? '  OK  ' : '  ROT '} ${was}`);
   if (!gut) alleGut = false;
+}
+const konsolenFehler = konsole.filter((z) => z.startsWith('error'));
+if (konsolenFehler.length > 0) {
+  console.log('\nKonsolenfehler:');
+  for (const z of konsolenFehler) console.log(`   ${z}`);
 }
 if (verstoesse.length > 0) {
   console.log('\nVerstösse:');

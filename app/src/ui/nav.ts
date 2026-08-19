@@ -18,7 +18,7 @@ interface Eintrag {
 
 const EINTRAEGE: readonly Eintrag[] = [
   { text: 'Schlüssel', ziel: { ziel: 'schluessel' } },
-  { text: 'Werkzeug', ziel: null, notiz: 'kommt in Phase 2 — Text und Dateien ver- und entschlüsseln' },
+  { text: 'Werkzeug', ziel: { ziel: 'werkzeug' } },
   { text: 'Kontakte', ziel: null, notiz: 'kommt in Phase 3 — Schlüssel von Freunden, Fingerprint-Abgleich' },
   { text: 'Info', ziel: { ziel: 'info' } },
 ];
@@ -50,7 +50,7 @@ export class Navigation {
 
   markiere(weg: Weg): void {
     // Die Unterzustände von „Schlüssel" (anlegen, exportieren) gehören dorthin.
-    const aktiv = weg.ziel === 'info' ? 'info' : 'schluessel';
+    const aktiv = weg.ziel === 'info' ? 'info' : weg.ziel === 'werkzeug' ? 'werkzeug' : 'schluessel';
     for (const [name, knopf] of this.#knoepfe) {
       const an = name === aktiv;
       knopf.classList.toggle('an', an);

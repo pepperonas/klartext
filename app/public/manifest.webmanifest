@@ -1,0 +1,21 @@
+{
+  "name": "klartext — PGP im Browser",
+  "short_name": "klartext",
+  "description": "PGP verschlüsseln, entschlüsseln, signieren und prüfen. Der private Schlüssel bleibt auf diesem Gerät.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1113",
+  "theme_color": "#0e1113",
+  "lang": "de",
+  "dir": "ltr",
+  "categories": ["utilities", "security"],
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

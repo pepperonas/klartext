@@ -1,7 +1,8 @@
 # PLAN.md — `klartext`
 
-> Status: **Entwurf, wartet auf Bestätigung.** Vor deinem OK entsteht kein Produktivcode.
-> Stand: 2026-08-19
+> Status: **Bestätigt und in Umsetzung.**
+> Phase 1 ✅ · Phase 2 ✅ · Phase 1.5 (Benutzbarkeit, siehe `PLAN-UX.md`) ✅
+> Phase 3–5 offen. Stand: 2026-08-19
 
 ---
 

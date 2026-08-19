@@ -22,7 +22,11 @@ Ziel: `klartext.celox.io`. Plan und Phasen in `PLAN.md`, Grenzen in
 
 ## Stand
 
-**Phase 1 (Krypto-Kern) fertig.** Phase 2–5 offen, siehe `PLAN.md` §10.
+**Phase 1 (Krypto-Kern) und Phase 2 (Werkzeug) fertig**, dazu ein
+Benutzbarkeits-Durchgang (Phase 1.5). Phase 3–5 offen, siehe `PLAN.md` §10 und
+`PLAN-UX.md`.
+
+Live unter [klartext.celox.io](https://klartext.celox.io/).
 
 ## Architektur in einem Satz
 
@@ -34,6 +38,7 @@ Schlüssel oder eine Passphrase im Ruhezustand.
 app/src/crypto/     Vertrag + Client. Enthält KEIN openpgp (per Test gepinnt).
 app/src/worker/     Der einzige Ort mit openpgp. Vault, Schlüssel, Auto-Lock.
 app/src/passphrase/ Vorschlagsgenerator + deutsche Diceware-Liste (7776 Wörter).
+app/src/trusted.ts  Trusted-Types-Richtlinie für BEIDE Skript-Adressen.
 app/src/design/     tokens.ts = einzige Quelle für Farben/Maße/Federn.
 app/src/ui/         Ansichten. Kein innerHTML, kein localStorage.
 relay/              Phase 4.
@@ -91,6 +96,56 @@ Erklärung, statt als Pflichtfeld.
 
 OpenPGP.js verwirft eine leere Adresse von selbst (`{name, email: ''}` → `"Name"`);
 die Beschriftung im Vault muss das mitmachen, sonst steht dort `Name <>`.
+
+## Das Werkzeug erkennt, statt zu fragen
+
+Keine Reiter für „verschlüsseln / entschlüsseln / signieren / prüfen". Wer etwas
+eingefügt bekommt, weiß oft gar nicht, was es ist — er müsste den richtigen
+Reiter erraten, bevor er anfangen kann.
+
+Stattdessen ein Feld: `tool.erkenne` sagt, was drinsteckt (Nachricht ·
+signierter Text · abgetrennte Signatur · öffentlicher Schlüssel · privater
+Schlüssel · Klartext), und die Oberfläche bietet an, was damit geht. Sie sagt
+auch, ob eine Nachricht überhaupt an einen der eigenen Schlüssel gerichtet ist.
+
+**Signaturen kennen DREI Zustände, nicht zwei:** gültig · ungültig · Unterzeichner
+unbekannt. Das dritte als „ungültig" darzustellen wäre eine Falschaussage — wir
+können es schlicht nicht beurteilen.
+
+⚠️ `signature.verified` ist ein Promise, das **wirft**, wenn die Signatur nicht
+stimmt; es liefert nicht `false`. Wer den Fehler verschluckt, meldet jede
+kaputte Signatur als gültig. `werteSignaturen` in `worker/werkzeug.ts` behandelt
+das ausdrücklich, `tests/werkzeug.test.ts` pinnt es gegen echte gpg-Signaturen.
+
+## Trusted Types: es gibt ZWEI Senken
+
+`require-trusted-types-for 'script'` betrifft beide Stellen, an denen diese App
+ein Skript lädt:
+
+* `new Worker(url)` — der Krypto-Worker
+* `navigator.serviceWorker.register()` — der Offline-Worker
+
+⚠️ Der zweite war zunächst übersehen, und die Folge war heimtückisch: die App
+lief, der Offline-Test lief (sein Server sendete keine CSP), und nur in
+Produktion registrierte sich der Service Worker **still nicht** — der Flugmodus
+hätte nie funktioniert. Aufgefallen ist es allein daran, dass der
+Datenabfluss-Test die Browser-Konsole mitliest.
+
+**Daraus die Regel: jeder Testserver sendet wortgleich dieselbe CSP wie nginx.**
+`tests/vertrag.test.ts` vergleicht alle drei Stellen Direktive für Direktive.
+
+## Offline heißt: die Assets müssen VOR dem Netzausfall im Cache sein
+
+⚠️ Beim ersten Laden holt der Browser die Assets, bevor der Service Worker aktiv
+ist — sie landen also nie in seinem Cache, und beim zweiten Aufruf ohne Netz
+fehlt genau das JavaScript, das die App ausmacht. `tools/sw-manifest.mjs` trägt
+deshalb nach jedem Build die tatsächlichen Dateinamen in den Service Worker ein
+und leitet daraus zugleich die Cache-Version ab.
+
+Die Shell läuft **network-first**: bei einer Krypto-App ist ein
+hängengebliebener alter Stand kein Schönheitsfehler, sondern ein Problem — eine
+ausgelieferte Korrektur muss ankommen. Nur `/assets/` (Inhalts-Hash im Namen,
+also unveränderlich) läuft cache-first.
 
 ## Wegfindung — keine Sackgassen
 
@@ -208,6 +263,17 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `passphrase.test.ts` | Gleichverteilung (vollständig durchgerechnet), Würfel-Zuordnung, Prüfsumme der Wortliste. |
 | `pruefung.test.ts` | Die Wortabfrage — inklusive Terminierung bei einer bösartigen Zufallsquelle. |
 | `router.test.ts` | Pfade hin und zurück; nie ein Geheimnis in der Adresse. |
+| `werkzeug.test.ts` | Das Werkzeug gegen echtes GnuPG, beide Richtungen. Erkennung, Signaturzustände, Rundlauf. |
+| `zerfall.test.ts` | Die Animation darf den Inhalt nie antasten. |
+| `trusted.test.ts` | Die Trusted-Types-Richtlinie lässt nur die zwei bekannten Adressen durch. |
+| `sw.test.ts` | Service-Worker-Vertrag: network-first, nur eigene Herkunft, Cache-Abräumung. |
+| `client.test.ts` | RPC-Zuordnung bei vertauschten Antworten, Sperr-Auslöser. |
+| `idb.test.ts` | Der Migrationspfad — hier verliert man Nutzerdaten, ohne es zu merken. |
+| `dom.test.ts` | Der `el()`-Helfer parst nie; dazu Quelltext-Zusicherungen (kein innerHTML, kein localStorage). |
+| `tokens.test.ts` | Beide Themen vollständig, keine fest verdrahteten Farben im Stylesheet. |
+| `spring.test.ts` | Der Feder-Integrator — Stillstand bei reduzierter Bewegung, kein NaN nach Tabwechsel. |
+| `nav.test.ts` | Navigationsleiste und Sperr-Anzeige. |
+| `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit. |
 
 **Regeln fürs Testschreiben in diesem Repo:**
 
@@ -274,6 +340,23 @@ so etwas nicht erst in Produktion auffällt.
 Vorschlags-Knopf im Formular steht. Der falsche wurde deaktiviert und
 umbeschriftet — immer `button[type=submit]`.
 
+**Vite bettet Worker als `data:`-URL ein, wenn das Muster nicht stimmt** — siehe
+oben. Der Import läuft deshalb über `?worker&url`.
+
+**`ergebnis.filename` ist nicht immer eine Zeichenkette.** Bei Nachrichten ohne
+Literal-Dateinamen — also bei allem, was klartext selbst erzeugt — kommt `null`.
+Ein `.length` darauf ließ jede eigene Nachricht beim Entschlüsseln platzen; vom
+Rundlauf-Test gefunden.
+
+**Ein Klick-Handler gehört VOR jedes frühe `return`.** Zweimal ist derselbe
+Fehler passiert: ein Knopf sah aus wie ein Weg nach vorn und tat nichts (Widerruf
+und der Zweig „selbst getippte Passphrase"). Gefunden von `wegfindung.mjs` und
+`offline.mjs` — die anderen Läufe kamen an diesen Zweigen nie vorbei.
+
+**`aria-hidden` allein reicht nicht.** Ein `<input type=file>` bleibt
+fokussierbar; für Hilfsmittel unsichtbar, per Tabulator erreichbar ist eine
+Falle. Es braucht zusätzlich `tabindex="-1"`.
+
 **Eine Größenschranke, die man bei jedem Anschlagen lockert, sichert nichts.**
 Zweimal ist sie angeschlagen, weil die App legitim wuchs (Wortliste, dann Router
 und Ansichten). Gemeint war nie eine Kilobyte-Zahl, sondern „hier kann keine
@@ -283,8 +366,12 @@ nachweislich enthält. Damit wächst sie mit.
 
 ## Was noch nicht da ist
 
-* Eigene Schriften (Inter + JetBrains Mono, OFL, auf Latein reduziert). Phase 1
-  fährt Systemschriften; die Typografie trägt das Motiv erst ab Phase 2.
-* Service-Worker / PWA — Phase 2.
-* Das Zerfalls-Motiv (Klartext ↔ Ciphertext) — Phase 2, dort ist der Text.
-* Alles zu Kontakten, Relay, Deployment — Phasen 3–5.
+* **Eigene Schriften** (Inter + JetBrains Mono, OFL, auf Latein reduziert).
+  Läuft weiter auf Systemschriften — der Typwechsel Proportional/Monospace
+  trägt das Motiv auch so, das Subsetting steht noch aus.
+* **Kontakte** (Phase 3): Einladungslinks, QR, Fingerprint-Verifikation,
+  Trust-States. Bis dahin fügt man fremde öffentliche Schlüssel im Werkzeug
+  direkt ein.
+* **Relay** (Phase 4) und **Härtung/Build-Hash im UI** (Phase 5).
+* Dateien laufen durch den Arbeitsspeicher, nicht auf die Platte: die File
+  System Access API fehlt noch, ab 100 MB warnt die Oberfläche ehrlich.

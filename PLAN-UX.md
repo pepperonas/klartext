@@ -1,6 +1,7 @@
 # PLAN-UX.md — `klartext` benutzbar machen
 
-> Status: **Entwurf, wartet auf Bestätigung.**
+> Status: **Bestätigt und umgesetzt.** Alle vier Stufen sind gebaut; der
+> Durchgang von damals läuft als `tools/e2e/wegfindung.mjs` bei jedem Bauen mit.
 > Grundlage: ein Durchgang durch alle sieben Zustände der laufenden App am
 > 2026-08-19, protokolliert mit den in jedem Zustand tatsächlich sichtbaren
 > Bedienelementen.

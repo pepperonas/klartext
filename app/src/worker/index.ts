@@ -10,6 +10,16 @@
 import { toWire } from '../crypto/errors.ts';
 import type { AnyRequest, AnyResponse, Op, WorkerEvent } from '../crypto/protocol.ts';
 import { Vault } from './vault.ts';
+import {
+  entschluessele,
+  entschluessleDatei,
+  erkenne,
+  leseEmpfaenger,
+  pruefe,
+  signiere,
+  verschluessele,
+  verschluessleDatei,
+} from './werkzeug.ts';
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -73,6 +83,51 @@ async function fuehreAus(anfrage: AnyRequest): Promise<unknown> {
       return { armored: await vault.widerrufszertifikat(anfrage.fingerprint) };
     case 'keys.applyRevocation':
       return await vault.wendeWiderrufAn(anfrage.armored);
+
+    // ------------------------------------------------------------- Werkzeug
+
+    case 'tool.erkenne':
+      return await erkenne(anfrage.eingabe, await vault.oeffentliche());
+
+    case 'tool.verschluessele': {
+      const empfaenger = [
+        ...(await vault.oeffentlicheZu(anfrage.anFingerprints)),
+        ...(await leseEmpfaenger(anfrage.anArmored)),
+      ];
+      const signierer = anfrage.signiereMit === null ? null : vault.zumSignieren(anfrage.signiereMit);
+      return { armored: await verschluessele(anfrage.klartext, empfaenger, signierer) };
+    }
+
+    case 'tool.entschluessele':
+      return await entschluessele(
+        anfrage.armored,
+        vault.entsperrteSchluessel(),
+        await vault.pruefSchluessel(anfrage.pruefeMit),
+      );
+
+    case 'tool.signiere':
+      return {
+        armored: await signiere(anfrage.text, vault.zumSignieren(anfrage.fingerprint), anfrage.abgetrennt),
+      };
+
+    case 'tool.pruefe':
+      return await pruefe(anfrage.text, anfrage.signatur, await vault.pruefSchluessel(anfrage.schluessel));
+
+    case 'datei.verschluessele': {
+      const empfaenger = [
+        ...(await vault.oeffentlicheZu(anfrage.anFingerprints)),
+        ...(await leseEmpfaenger(anfrage.anArmored)),
+      ];
+      const signierer = anfrage.signiereMit === null ? null : vault.zumSignieren(anfrage.signiereMit);
+      return await verschluessleDatei(anfrage.datei, empfaenger, signierer);
+    }
+
+    case 'datei.entschluessele':
+      return await entschluessleDatei(
+        anfrage.datei,
+        vault.entsperrteSchluessel(),
+        await vault.pruefSchluessel(anfrage.pruefeMit),
+      );
 
     default: {
       const unerreichbar: never = anfrage;

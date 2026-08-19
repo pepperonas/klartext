@@ -7,6 +7,7 @@
  */
 
 import WORKER_URL from '../worker/index.ts?worker&url';
+import { erlaube, vertraue } from '../trusted.ts';
 import { fromWire, KlartextError } from './errors.ts';
 import type {
   AnyResponse,
@@ -31,51 +32,20 @@ const LEERER_STATUS: VaultStatus = {
 };
 
 /**
- * Trusted Types: der `Worker`-Konstruktor ist eine `TrustedScriptURL`-Senke.
+ * Der Krypto-Worker wird über `?worker&url` eingebunden.
  *
- * Die CSP verlangt `require-trusted-types-for 'script'`. Ohne Richtlinie
- * scheitert der Start mit "Failed to construct 'Worker'" — die App kommt gar
- * nicht hoch. Der E2E-Testserver sendet dieselbe CSP wie nginx, damit dieser
- * Fall nicht erst in Produktion auffaellt.
- *
- * ⚠️ Die Adresse kommt ueber `?worker&url` herein und NICHT ueber
- *    `new Worker(new URL('…', import.meta.url))`. Vites Worker-Erkennung haengt
- *    am woertlichen Muster: sobald das `new URL(…)` in eine Variable oder einen
- *    Funktionsaufruf wandert, haelt Vite es fuer ein gewoehnliches Asset und
- *    bettet die TypeScript-Quelle als base64-`data:`-URL in den Haupt-Bundle
- *    ein. Der Worker ist dann kein eigener Chunk mehr, und der Browser lehnt
- *    ihn unter `worker-src 'self'` ohnehin ab. Genau das ist hier passiert.
+ * ⚠️ NICHT über `new Worker(new URL('…', import.meta.url))`: Vites
+ *    Worker-Erkennung hängt am wörtlichen Muster: sobald das `new URL(…)` in
+ *    eine Variable oder einen Funktionsaufruf wandert, hält Vite es für ein
+ *    gewöhnliches Asset und bettet die TypeScript-Quelle als base64-`data:`-URL
+ *    in den Haupt-Bundle ein. Der Worker ist dann kein eigener Chunk mehr, und
+ *    der Browser lehnt ihn unter `worker-src 'self'` ohnehin ab.
  *    `tests/no-crypto-in-main.test.ts` pinnt beides.
  *
- * Die Richtlinie laesst ausschliesslich diese eine Adresse durch — wer es je
- * schafft, eine andere hineinzureichen, bekommt eine Ausnahme statt eines
- * fremden Workers.
+ * Die Adresse läuft durch die Trusted-Types-Richtlinie (src/trusted.ts) — die
+ * CSP verlangt das für jede Skript-Senke.
  */
-
-interface TrustedTypesFabrik {
-  createPolicy: (
-    name: string,
-    regeln: { createScriptURL: (eingabe: string) => string },
-  ) => { createScriptURL: (eingabe: string) => string };
-}
-
-let politik: { createScriptURL: (eingabe: string) => string } | null = null;
-
-function workerQuelle(): string {
-  const fabrik = (globalThis as { trustedTypes?: TrustedTypesFabrik }).trustedTypes;
-  if (fabrik === undefined) return WORKER_URL;
-
-  // createPolicy wirft beim zweiten Aufruf mit demselben Namen.
-  politik ??= fabrik.createPolicy('klartext-worker', {
-    createScriptURL: (eingabe) => {
-      if (eingabe !== WORKER_URL) {
-        throw new Error('Nur der eigene Krypto-Worker darf geladen werden.');
-      }
-      return eingabe;
-    },
-  });
-  return politik.createScriptURL(WORKER_URL);
-}
+erlaube(WORKER_URL);
 
 export class CryptoClient {
   readonly #worker: Worker;
@@ -99,7 +69,7 @@ export class CryptoClient {
    * erst im Haupt-Bundle landet.
    */
   static erzeuge(): CryptoClient {
-    const worker = new Worker(workerQuelle(), { type: 'module', name: 'klartext-krypto' });
+    const worker = new Worker(vertraue(WORKER_URL), { type: 'module', name: 'klartext-krypto' });
     return new CryptoClient(worker);
   }
 
