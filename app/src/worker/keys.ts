@@ -63,7 +63,7 @@ export function entpackeArmorBlock(text: string): string {
 
 export async function beschreibeSchluessel(
   key: PublicKey,
-  extra: { isDefault: boolean; label: string },
+  extra: { isDefault: boolean; label: string; backupAt?: string | null },
 ): Promise<KeyInfo> {
   const algo = key.getAlgorithmInfo();
   const ablauf = await key.getExpirationTime();
@@ -83,6 +83,8 @@ export async function beschreibeSchluessel(
     isRevoked: await key.isRevoked(),
     isDefault: extra.isDefault,
     label: extra.label,
+    hasBackup: (extra.backupAt ?? null) !== null,
+    backupAt: extra.backupAt ?? null,
   };
 }
 

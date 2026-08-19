@@ -32,6 +32,17 @@ export interface KeyInfo {
   readonly isRevoked: boolean;
   readonly isDefault: boolean;
   readonly label: string;
+  /**
+   * Wurde der private Schlüssel je als Datei ausgegeben?
+   *
+   * Die Passphrase ist KEIN Backup — sie entsperrt einen gespeicherten
+   * Schlüssel, sie stellt ihn nicht wieder her. Ohne Sicherungsdatei ist er
+   * nach gelöschten Browserdaten verloren. Deshalb merkt sich der Vault das
+   * und die Oberfläche sagt es, bis es erledigt ist.
+   */
+  readonly hasBackup: boolean;
+  /** ISO-Zeitstempel der letzten Sicherung, sonst null. */
+  readonly backupAt: string | null;
 }
 
 export type VaultState = 'empty' | 'locked' | 'unlocked';

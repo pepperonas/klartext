@@ -57,6 +57,22 @@ Eine **E-Mail-Adresse braucht klartext nicht** — deine Identität ist der
 Fingerprint. Sie ist optional und nur sinnvoll, wenn du denselben Schlüssel auch
 für verschlüsselte E-Mail nutzen willst.
 
+## Geführt statt allein gelassen
+
+Der erste Schlüssel entsteht in sechs benannten Schritten — *Wer bist du ·
+Verfahren · Passphrase · Sichern · Widerruf · Backup*. Jeder sagt, warum es ihn
+gibt; weiter geht es erst, wenn er erledigt ist; zurück geht immer, auch mit der
+Zurück-Geste des Browsers.
+
+Zwei Schritte sind dabei mehr als Formsache:
+
+* **Sichern** fragt drei Wörter nach Position ab. Ein Haken „habe ich notiert"
+  ist eine Selbstauskunft; das hier ist ein Nachweis.
+* **Backup** legt die Schlüsseldatei an. Denn die Passphrase ist **kein Seed**:
+  sie entsperrt einen gespeicherten Schlüssel, sie stellt ihn nicht wieder her.
+  Sind die Browserdaten gelöscht, hilft der Zettel mit den Wörtern nicht mehr.
+  Ohne Sicherung mahnt die Schlüsselkarte dauerhaft.
+
 ## Kryptografie
 
 Nichts davon ist selbst geschrieben. Die Krypto kommt vollständig aus
@@ -93,9 +109,10 @@ npm run test:alles   # dazu Browserlauf und Zugänglichkeit
 
 | Was | Umfang |
 |---|---|
-| Tests | 116, davon 18 gegen **echtes GnuPG** |
-| Browserlauf | 19 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
-| Zugänglichkeit | WCAG 2.1 A + AA, 12 Zustände (6 Ansichten × 2 Themen), 0 Verstöße |
+| Tests | 135, davon 18 gegen **echtes GnuPG** |
+| Datenabfluss | 17 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
+| Wegfindung | 21 Kriterien: kein Zustand ohne Ausweg, kein Knopf ohne Wirkung |
+| Zugänglichkeit | WCAG 2.1 A + AA, 16 Zustände (8 Ansichten × 2 Themen), 0 Verstöße |
 
 Die GPG-Testvektoren liegen unter `fixtures/gpg/` und stammen aus echtem GnuPG,
 nicht aus OpenPGP.js — ein Interop-Test gegen die eigene Bibliothek beweist

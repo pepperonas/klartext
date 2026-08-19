@@ -92,6 +92,52 @@ Erklärung, statt als Pflichtfeld.
 OpenPGP.js verwirft eine leere Adresse von selbst (`{name, email: ''}` → `"Name"`);
 die Beschriftung im Vault muss das mitmachen, sonst steht dort `Name <>`.
 
+## Wegfindung — keine Sackgassen
+
+`tools/e2e/wegfindung.mjs` läuft alle zehn Zustände ab und verlangt für jeden:
+eine Überschrift, die sagt wo man ist · mindestens einen Weg heraus · keinen
+sichtbaren Knopf, der nichts tut · eine funktionierende Zurück-Geste.
+
+Anlass war die Frage „wie komme ich hier zurück?". Im gesperrten Zustand gab es
+genau einen Handgriff und keinen Ausweg — und der Knopf „Sperren" stand
+weiterhin in der Kopfzeile, obwohl schon gesperrt war. Dabei sind **öffentliche
+Schlüssel nicht geheim** und lassen sich auch gesperrt lesen und ausgeben; die
+App verweigerte das grundlos. Jetzt bleibt die Schlüsselliste sichtbar, nur eben
+gesperrt.
+
+⚠️ Beim allerersten Lauf fand dieser Test sofort eine echte Attrappe: dem
+„Weiter" im Widerrufs-Schritt fehlte der Klick-Handler. Der Knopf sah aus wie
+ein Weg nach vorn und tat nichts.
+
+## Die Passphrase ist KEIN Seed
+
+Der schwerwiegendste Irrtum, den diese App zulassen könnte:
+
+| | Wallet-Seed (BIP-39) | Passphrase hier |
+|---|---|---|
+| Was er tut | **erzeugt** den Schlüssel neu | **entsperrt** einen gespeicherten |
+| Browserdaten weg | egal | **Schlüssel unwiederbringlich weg** |
+| Reicht als Backup | ja | **nein** |
+
+Wer die sechs Wörter für ein Backup hält, verliert die Schlüssel beim ersten
+gelöschten Browserprofil — mit dem Zettel in der Hand. Deshalb: der geführte
+Ablauf endet mit einem Backup-Schritt, `KeyInfo.hasBackup` wird im Vault
+festgehalten (gesetzt beim erfolgreichen Export des privaten Schlüssels), und
+die Schlüsselkarte mahnt dauerhaft, solange keine Sicherung existiert.
+
+## Sicherung der Passphrase wird NACHGEWIESEN
+
+Ein Haken „Ich habe sie notiert" ist eine Selbstauskunft, die man in zwei
+Sekunden setzt. Und das Wiederholfeld prüfte nichts mehr, sobald der Vorschlag
+es mitfüllte. Deshalb fragt Schritt 4 **drei Wörter nach Position** ab
+(`passphrase/pruefung.ts`), wie es Wallets tun.
+
+⚠️ `waehlePositionen` ist ein teilweises **Fisher-Yates-Mischen**, nicht
+„ziehen, bis genug Verschiedene beisammen sind". Die naive Fassung dreht sich
+ewig, sobald die Quelle nicht genug verschiedene Werte hergibt — beim ersten
+Testlauf hing die Suite, statt fehlzuschlagen. Im Formular wäre es ein
+eingefrorener Schritt ohne Fehlermeldung gewesen.
+
 ## Regeln, die nicht verhandelbar sind
 
 1. **Kein `openpgp` außerhalb von `app/src/worker/`.** Vier Tests halten das
@@ -160,6 +206,8 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `armor.test.ts` | gpg-Eigenheiten beim Einfügen (siehe unten). |
 | `autolock.test.ts` | Der Sperr-Zeitgeber. |
 | `passphrase.test.ts` | Gleichverteilung (vollständig durchgerechnet), Würfel-Zuordnung, Prüfsumme der Wortliste. |
+| `pruefung.test.ts` | Die Wortabfrage — inklusive Terminierung bei einer bösartigen Zufallsquelle. |
+| `router.test.ts` | Pfade hin und zurück; nie ein Geheimnis in der Adresse. |
 
 **Regeln fürs Testschreiben in diesem Repo:**
 
@@ -227,9 +275,11 @@ Vorschlags-Knopf im Formular steht. Der falsche wurde deaktiviert und
 umbeschriftet — immer `button[type=submit]`.
 
 **Eine Größenschranke, die man bei jedem Anschlagen lockert, sichert nichts.**
-Als die Wortliste dazukam, sprang der Einstiegspunkt auf 94 kB. Statt die
-Schranke hochzusetzen, liegt die Liste jetzt in einem eigenen Chunk — wo sie
-ohnehin hingehört — und die Schranke wurde auf 40 kB *verschärft*.
+Zweimal ist sie angeschlagen, weil die App legitim wuchs (Wortliste, dann Router
+und Ansichten). Gemeint war nie eine Kilobyte-Zahl, sondern „hier kann keine
+Kryptobibliothek drinstecken" — deshalb ist sie jetzt **relativ**: der
+Einstiegspunkt muss unter einem Viertel des Chunks liegen, der openpgp
+nachweislich enthält. Damit wächst sie mit.
 
 ## Was noch nicht da ist
 

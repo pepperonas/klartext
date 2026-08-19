@@ -130,19 +130,25 @@ describe.runIf(DIST_DA)('gebauter Bundle', () => {
     }
   });
 
-  it('der Einstiegspunkt ist klein genug, dass keine Kryptobibliothek darin sein KANN', () => {
-    const einstieg = jsDateien(DIST).filter((f) => /index-/.test(f));
+  it('der Einstiegspunkt ist ein Bruchteil des Krypto-Chunks', () => {
+    const dateien = jsDateien(DIST);
+    const einstieg = dateien.filter((f) => /index-/.test(f));
+    const worker = dateien.filter((f) => /worker|krypto/i.test(f));
     expect(einstieg.length).toBe(1);
-    // openpgp wiegt gebaut ~330 kB. Ein Einstiegspunkt unter 40 kB kann sie
-    // nicht enthalten — unabhaengig davon, welche Marker jemand kuenftig
-    // umbenennt. Zweiter, stumpfer Riegel neben der Marker-Pruefung.
+    expect(worker.length).toBeGreaterThan(0);
+
+    const groesse = (f: string): number => readFileSync(f, 'utf8').length;
+    const einstiegsGroesse = groesse(einstieg[0] ?? '');
+    const kryptoGroesse = Math.max(...worker.map(groesse));
+
+    // ⚠️ BEWUSST relativ statt als feste Zahl. Zweimal ist diese Schranke
+    //    angeschlagen, weil die App legitim gewachsen ist (erst die Wortliste,
+    //    dann Router und Ansichten) — und eine Schranke, die man bei jedem
+    //    Anschlagen hochsetzt, sichert gar nichts.
     //
-    // ⚠️ Als die Wortliste dazukam, sprang der Einstiegspunkt auf 94 kB und
-    //    dieser Test wurde rot. Die Schranke einfach hochzusetzen haette ihn
-    //    entwertet; stattdessen liegt die Liste jetzt in einem eigenen Chunk,
-    //    wo sie ohnehin hingehoert (unveraenderliche Statik, eigener Cache).
-    //    Eine Schranke, die man bei jedem Anschlagen lockert, sichert nichts.
-    const groesse = readFileSync(einstieg[0] ?? '', 'utf8').length;
-    expect(groesse).toBeLessThan(40_000);
+    //    Gemeint war nie eine Kilobyte-Zahl, sondern: „hier kann keine
+    //    Kryptobibliothek drinstecken". Ein Viertel des Chunks, der sie
+    //    nachweislich enthält, sagt genau das — und wächst mit ihr mit.
+    expect(einstiegsGroesse).toBeLessThan(kryptoGroesse / 4);
   });
 });

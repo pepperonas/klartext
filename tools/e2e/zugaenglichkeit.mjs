@@ -73,58 +73,80 @@ async function pruefe(name, vorbereiten) {
   return ergebnisse;
 }
 
+/** Führt bis zu einem Schlüssel im Bund. */
+async function bisSchluessel(seite) {
+  await seite.waitForSelector('.nav');
+  await seite.click('button:has-text("Schlüssel anlegen")');
+  await seite.waitForSelector('#name');
+  await seite.fill('#name', 'Prüfperson');
+  await seite.click('button:has-text("Weiter")');
+  await seite.waitForSelector('.wahlreihe');
+  await seite.click('.wahlkarte:has-text("Curve25519")');
+  await seite.click('button:has-text("Weiter")');
+  await seite.waitForSelector('.vorschlag-woerter');
+  const woerter = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
+  await seite.click('button:has-text("Weiter")');
+  await seite.waitForSelector('.wortproben');
+  const positionen = await seite.$$eval('.wortprobe', (ns) =>
+    ns.map((n) => Number((n.getAttribute('aria-label') ?? '').replace(/\D+/g, ''))));
+  const proben = await seite.locator('.wortprobe').all();
+  for (let i = 0; i < proben.length; i++) await proben[i].fill(woerter[positionen[i] - 1] ?? '');
+  await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
+  await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
+  await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
+  await seite.click('.schritt-fuss button:has-text("Weiter")');
+  await seite.waitForSelector('#backup-pw');
+  await seite.click('button:has-text("Ohne Sicherung fortfahren")');
+  await seite.click('button:has-text("Verstanden")');
+  await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+}
+
 const alle = [
   ...(await pruefe('leerer Schlüsselbund', async () => { await new Promise((r) => setTimeout(r, 300)); })),
-  ...(await pruefe('Vorschlagsfeld offen', async (seite) => {
-    await seite.waitForSelector('#name');
+  ...(await pruefe('Info — was klartext nicht kann', async (seite) => {
+    await seite.waitForSelector('.nav');
+    await seite.click('.nav-eintrag:has-text("Info")');
+    await seite.waitForSelector('.grenze');
+  })),
+  ...(await pruefe('Anlegen, Identität', async (seite) => {
+    await seite.waitForSelector('.nav');
+    await seite.click('button:has-text("Schlüssel anlegen")');
+    await seite.waitForSelector('.schrittleiste');
     await seite.click('.ausklapp summary');
-    await seite.click('button:has-text("Passphrase vorschlagen")');
-    await seite.waitForSelector('.vorschlag-wort');
   })),
-  ...(await pruefe('Würfelmodus offen', async (seite) => {
-    await seite.waitForSelector('#name');
-    await seite.click('button:has-text("Passphrase vorschlagen")');
-    await seite.waitForSelector('.vorschlag-wort');
-    await seite.click('.vorschlag button:has-text("Selbst würfeln")');
-    await seite.waitForSelector('.wuerfelfeld');
-  })),
-  ...(await pruefe('Export mit Passwortvorschlag', async (seite) => {
+  ...(await pruefe('Anlegen, Passphrase-Vorschlag', async (seite) => {
+    await seite.waitForSelector('.nav');
+    await seite.click('button:has-text("Schlüssel anlegen")');
     await seite.waitForSelector('#name');
     await seite.fill('#name', 'Prüfperson');
-    await seite.selectOption('#algo', 'curve25519');
-    await seite.fill('#pw', 'eine-lange-passphrase');
-    await seite.fill('#pw2', 'eine-lange-passphrase');
-    await seite.click('button[type=submit]');
-    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
     await seite.click('button:has-text("Weiter")');
-    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
-    await seite.click('button:has-text("Privaten Schlüssel")');
+    await seite.waitForSelector('.wahlreihe');
+    await seite.click('button:has-text("Weiter")');
+    await seite.waitForSelector('.vorschlag-woerter');
+  })),
+  ...(await pruefe('Anlegen, Sichern mit Wortabfrage', async (seite) => {
+    await seite.waitForSelector('.nav');
+    await seite.click('button:has-text("Schlüssel anlegen")');
+    await seite.waitForSelector('#name');
+    await seite.fill('#name', 'Prüfperson');
+    await seite.click('button:has-text("Weiter")');
+    await seite.waitForSelector('.wahlreihe');
+    await seite.click('button:has-text("Weiter")');
+    await seite.waitForSelector('.vorschlag-woerter');
+    await seite.click('button:has-text("Weiter")');
+    await seite.waitForSelector('.wortproben');
+  })),
+  ...(await pruefe('Schlüssel vorhanden, ohne Sicherung', bisSchluessel)),
+  ...(await pruefe('Sicherung erzeugen', async (seite) => {
+    await bisSchluessel(seite);
+    await seite.click('button:has-text("Sicherung erzeugen")');
     await seite.waitForSelector('#export-pw');
     await seite.click('button:has-text("Passwort vorschlagen")');
     await seite.waitForSelector('.passwort-vorschlag');
   })),
-  ...(await pruefe('Schlüssel angelegt', async (seite) => {
-    await seite.waitForSelector('#name');
-    await seite.fill('#name', 'Prüfperson');
-    await seite.selectOption('#algo', 'curve25519');
-    await seite.fill('#pw', 'eine-lange-passphrase');
-    await seite.fill('#pw2', 'eine-lange-passphrase');
-    await seite.click('button[type=submit]');
-    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-    await seite.click('button:has-text("Weiter")');
-    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
-  })),
   ...(await pruefe('gesperrt', async (seite) => {
-    await seite.waitForSelector('#name');
-    await seite.fill('#name', 'Prüfperson');
-    await seite.selectOption('#algo', 'curve25519');
-    await seite.fill('#pw', 'eine-lange-passphrase');
-    await seite.fill('#pw2', 'eine-lange-passphrase');
-    await seite.click('button[type=submit]');
-    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-    await seite.click('button:has-text("Weiter")');
-    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
-    await seite.click('.kopf-knoepfe button');
+    await bisSchluessel(seite);
+    await seite.click('.kopf-knoepfe button:has-text("Sperren")');
     await seite.waitForSelector('#pw');
   })),
 ];

@@ -46,6 +46,8 @@ interface GespeicherterSchluessel {
   /** Argon2id + AEAD. Absichtlich NICHT das Format, das gpg liest. */
   readonly armoredSecret: string;
   readonly importedAt: string;
+  /** Wann der private Schlüssel zuletzt als Datei ausgegeben wurde. */
+  readonly backupAt?: string | null;
 }
 
 interface EinstellungsZeile {
@@ -191,6 +193,7 @@ export class Vault {
       infos.push(await beschreibeSchluessel(oeffentlich, {
         isDefault: zeile.isDefault,
         label: zeile.label,
+        backupAt: zeile.backupAt ?? null,
       }));
     }
     return infos.sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.created.localeCompare(b.created));
@@ -301,8 +304,13 @@ export class Vault {
       throw new KlartextError('PASSPHRASE_REQUIRED');
     }
     const key = this.#privaterSchluessel(normal);
+    const armored = await schuetzeFuerExport(key, exportPassphrase);
+    // Erst nach dem erfolgreichen Verschlüsseln vermerken — sonst stünde
+    // „gesichert" da, obwohl der Vorgang gescheitert ist.
+    await this.#speichere({ ...zeile, backupAt: new Date().toISOString() });
+    this.#beiAenderung();
     return {
-      armored: await schuetzeFuerExport(key, exportPassphrase),
+      armored,
       filename: `klartext-${kurz}.sec.asc`,
       gpgCompatible: true,
     };

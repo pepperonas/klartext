@@ -21,10 +21,11 @@
     "lint": "eslint .",
     "fixtures": "bash tools/gen-gpg-fixtures.sh",
     "audit:ci": "npm audit --audit-level=high",
-    "test:alles": "npm run build && npm run test && npm run e2e && npm run a11y",
+    "test:alles": "npm run build && npm run test && npm run e2e && npm run wege && npm run a11y",
     "e2e": "node tools/e2e/nichts-verlaesst-den-browser.mjs",
     "a11y": "node tools/e2e/zugaenglichkeit.mjs",
-    "pruefe": "npm run lint && npm run typecheck && npm run test"
+    "pruefe": "npm run lint && npm run typecheck && npm run test",
+    "wege": "node tools/e2e/wegfindung.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

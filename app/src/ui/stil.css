@@ -330,3 +330,191 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 }
 .ausklapp[open] > summary { margin-bottom: var(--kt-raum-3); color: var(--kt-text); }
 .ausklapp > *:not(summary) { margin-bottom: var(--kt-raum-3); }
+
+/* ------------------------------------------------------- Passwortfelder */
+
+.feld-mit-schalter { position: relative; display: flex; align-items: center; }
+/* Platz für den Schalter freihalten, damit lange Passphrasen nicht darunter
+   verschwinden. */
+.feld-mit-schalter input { padding-right: 52px; }
+
+/* Sobald das Material sichtbar ist, wird es zu Material: Festbreitenschrift,
+   dieselbe Regel wie bei Ciphertext und Fingerprints. */
+.feld-mit-schalter input.sichtbar {
+  font-family: var(--kt-schrift-mono);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.sichtschalter {
+  position: absolute;
+  right: 4px;
+  /* 44 px Trefferfläche — Fingerkuppen sind kein Mauszeiger. */
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--kt-r-klein);
+  background: transparent;
+  color: var(--kt-text-leise);
+  cursor: pointer;
+}
+.sichtschalter:hover { color: var(--kt-text); background: var(--kt-flaeche-hoch); }
+.sichtschalter[aria-pressed='true'] { color: var(--kt-akzent); }
+.sichtschalter:focus-visible { outline: 2px solid var(--kt-akzent); outline-offset: -2px; }
+
+/* ------------------------------------------------------------- Navigation */
+
+.nav {
+  display: flex;
+  gap: var(--kt-raum-1);
+  flex-wrap: wrap;
+  padding: var(--kt-raum-3) 0;
+  border-bottom: 1px solid var(--kt-kontur);
+}
+.nav-eintrag {
+  font: inherit;
+  font-size: 0.94rem;
+  min-height: 40px;
+  padding: 0 var(--kt-raum-4);
+  border: none;
+  border-radius: var(--kt-r-voll);
+  background: transparent;
+  color: var(--kt-text-leise);
+  cursor: pointer;
+}
+.nav-eintrag:hover { color: var(--kt-text); background: var(--kt-flaeche-hoch); }
+.nav-eintrag.an { background: var(--kt-akzent-schwach); color: var(--kt-akzent); font-weight: 600; }
+/* Was es noch nicht gibt, wird gezeigt statt verschwiegen: ein leerer
+   Bildschirm wirkt kaputt, ein ausgegrauter Eintrag wirkt unfertig. */
+.nav-eintrag.aus {
+  display: flex;
+  align-items: center;
+  color: var(--kt-text-still);
+  cursor: default;
+  text-decoration: line-through;
+  text-decoration-color: var(--kt-kontur-stark);
+}
+
+.wortmarke {
+  font: inherit;
+  font-family: var(--kt-schrift-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  border: none;
+  background: transparent;
+  color: var(--kt-text);
+  cursor: pointer;
+  padding: 0;
+}
+.wortmarke:hover { color: var(--kt-akzent); }
+
+.kerbe { cursor: pointer; }
+.knopf.weg { display: none; }
+
+/* --------------------------------------------------------- Schrittleiste */
+
+.schrittleiste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kt-raum-2) var(--kt-raum-4);
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--kt-raum-2);
+}
+.schritt { display: flex; align-items: center; gap: var(--kt-raum-2); font-size: 0.86rem; color: var(--kt-text-still); }
+.schritt-nr {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--kt-kontur-stark);
+  font-size: 0.78rem;
+  flex: none;
+}
+.schritt.erledigt { color: var(--kt-text-leise); }
+.schritt.erledigt .schritt-nr { background: var(--kt-akzent-schwach); border-color: var(--kt-akzent); color: var(--kt-akzent); }
+.schritt.aktuell { color: var(--kt-text); font-weight: 600; }
+.schritt.aktuell .schritt-nr { background: var(--kt-akzent); border-color: var(--kt-akzent); color: var(--kt-auf-akzent); }
+
+.schritt-inhalt { display: flex; flex-direction: column; gap: var(--kt-raum-4); }
+.schritt-inhalt h3 { margin: 0; font-size: 1.2rem; }
+.schritt-fuss { margin-top: var(--kt-raum-2); padding-top: var(--kt-raum-4); border-top: 1px solid var(--kt-kontur); }
+.unterabschnitt { margin: var(--kt-raum-2) 0 0; font-size: 1rem; }
+
+/* ------------------------------------------------------------- Wahlkarten */
+
+.wahlreihe { display: grid; gap: var(--kt-raum-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.wahlkarte {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-2);
+  padding: var(--kt-raum-4);
+  border: 1px solid var(--kt-kontur-stark);
+  border-radius: var(--kt-r-mittel);
+  background: transparent;
+  color: var(--kt-text);
+  cursor: pointer;
+}
+.wahlkarte:hover { background: var(--kt-flaeche-hoch); }
+.wahlkarte.an { border-color: var(--kt-akzent); background: var(--kt-akzent-schwach); }
+.wahl-titel { font-weight: 600; font-size: 1.02rem; }
+.wahl-text { font-size: 0.88rem; color: var(--kt-text-leise); }
+.wahlkarte.an .wahl-text { color: var(--kt-text); }
+
+/* ---------------------------------------------------------- Warnkästen */
+
+.warnkasten {
+  border-left: 3px solid var(--kt-warnung);
+  background: var(--kt-warnung-schwach);
+  border-radius: var(--kt-r-klein);
+  padding: var(--kt-raum-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-2);
+}
+.warnkasten strong { font-size: 0.98rem; }
+.warnkasten .hinweis { color: var(--kt-text); }
+.warnkasten.mahnung { border-left-color: var(--kt-gefahr); background: var(--kt-gefahr-schwach); }
+
+/* ------------------------------------------------------------ Wortproben */
+
+.vw-pos { font-size: 0.7rem; color: var(--kt-text-still); font-variant-numeric: tabular-nums; }
+.wortproben { display: grid; gap: var(--kt-raum-3); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.wortprobe-zeile { display: flex; flex-direction: column; gap: var(--kt-raum-1); }
+.wortprobe-zeile > span { font-size: 0.86rem; color: var(--kt-text-leise); }
+.wortprobe { font-family: var(--kt-schrift-mono); }
+.wortprobe.falsch { border-color: var(--kt-gefahr); }
+
+/* ------------------------------------------------------------- Sonstiges */
+
+.knopf.gross { min-height: 52px; font-size: 1rem; padding: 0 var(--kt-raum-6); }
+.knopf.gefahr { background: var(--kt-gefahr); color: var(--kt-auf-gefahr); border-color: transparent; font-weight: 600; }
+.gross { font-size: 1.5rem; }
+.ansicht-kopf { justify-content: space-between; margin-bottom: var(--kt-raum-2); }
+.pille.gut { background: var(--kt-gut-schwach); color: var(--kt-gut); }
+.pille.warnung { background: var(--kt-warnung-schwach); color: var(--kt-warnung); }
+.liste { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--kt-raum-2); }
+.grenze h3 { display: flex; gap: var(--kt-raum-3); align-items: baseline; }
+.grenze-nr { color: var(--kt-text-still); font-variant-numeric: tabular-nums; flex: none; }
+.karte p { margin: 0 0 var(--kt-raum-3); }
+.karte p:last-child { margin-bottom: 0; }
+
+.fuss { display: flex; align-items: center; gap: var(--kt-raum-4); flex-wrap: wrap; justify-content: space-between; }
+.fuss-link {
+  font: inherit;
+  font-size: 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--kt-text-leise);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: var(--kt-raum-2) 0;
+}
+.fuss-link:hover { color: var(--kt-akzent); }

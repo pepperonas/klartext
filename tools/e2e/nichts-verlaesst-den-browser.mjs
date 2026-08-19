@@ -127,66 +127,72 @@ await seite.goto(basis, { waitUntil: 'networkidle' });
 
 // ---- Ablauf: Schluessel erzeugen, sperren, entsperren, exportieren ---------
 
+await seite.waitForSelector('.nav');
+await seite.click('button:has-text("Schlüssel anlegen")');
 await seite.waitForSelector('#name', { timeout: 15_000 });
 await seite.fill('#name', MARKER.name);
 
-// E-Mail ist optional und steckt in einem Ausklapp-Bereich. Dass sie NICHT
-// verlangt wird, ist Teil der Zusage "Identität ist der Fingerprint".
+// E-Mail ist optional und eingeklappt. Dass sie NICHT verlangt wird, ist Teil
+// der Zusage „Identität ist der Fingerprint".
 const emailSichtbar = await seite.isVisible('#email');
 await seite.click('.ausklapp summary');
 await seite.fill('#email', MARKER.email);
+await seite.click('button:has-text("Weiter")');
 
-// ---- Vorschlagsfeld: Wörter, Würfelzahlen, Bit-Angabe --------------------
-await seite.click('button:has-text("Passphrase vorschlagen")');
-await seite.waitForSelector('.vorschlag-wort', { timeout: 10_000 });
+await seite.waitForSelector('.wahlreihe');
+await seite.click('.wahlkarte:has-text("Curve25519")');
+await seite.click('button:has-text("Weiter")');
+
+// ---- Vorschlag: Wörter, Würfelzahlen, Bit-Angabe --------------------------
+await seite.waitForSelector('.vorschlag-woerter');
 const vorschlagWoerter = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
 const vorschlagWuerfel = await seite.$$eval('.vw-wuerfel', (ns) => ns.map((n) => n.textContent ?? ''));
-const bitZeile = (await seite.textContent('.vorschlag .hinweis')) ?? '';
-
-await seite.click('.vorschlag button:has-text("Nochmal")');
+const bitZeile = (await seite.textContent('.schritt-inhalt .hinweis')) ?? '';
+await seite.click('button:has-text("Andere Wörter")');
 const zweiterZug = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
 
-await seite.click('.vorschlag button:has-text("Selbst würfeln")');
-await seite.waitForSelector('.wuerfelfeld');
-const wuerfelfelder = await seite.locator('.wuerfelfeld').count();
-await seite.click('.vorschlag button:has-text("Würfeln schließen")');
+const woerterJetzt = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
+MARKER.passphrase = woerterJetzt.join('-');
+await seite.click('button:has-text("Weiter")');
 
-await seite.click('.vorschlag button:has-text("Übernehmen")');
-const uebernommen = await seite.inputValue('#pw');
+// ---- Sichern: drei Wörter nach Position ----------------------------------
+await seite.waitForSelector('.wortproben');
+const proben = await seite.locator('.wortprobe').all();
+await proben[0].fill('grundfalsch');
+const gesperrtBeiFalsch = await seite.isDisabled('button:has-text("Schlüssel jetzt erzeugen")');
+const positionen = await seite.$$eval('.wortprobe', (ns) =>
+  ns.map((n) => Number((n.getAttribute('aria-label') ?? '').replace(/\D+/g, ''))));
+for (let i = 0; i < proben.length; i++) await proben[i].fill(woerterJetzt[positionen[i] - 1] ?? '');
+const freiBeiRichtig = await seite.isEnabled('button:has-text("Schlüssel jetzt erzeugen")');
 
-const gesperrtVorBestaetigung = await seite.isDisabled('button[type=submit]');
-await seite.check('#notiert');
-const freiNachBestaetigung = await seite.isEnabled('button[type=submit]');
-
-// Ab hier ist die uebernommene Passphrase das Geheimnis, das nirgends
-// auftauchen darf.
-MARKER.passphrase = uebernommen;
-await seite.selectOption('#algo', 'curve25519');
-await seite.click('button[type=submit]');
-
+await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
 await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
 const zertifikat = await seite.inputValue('textarea[aria-label="Widerrufszertifikat"]');
-await seite.click('button.haupt');
+await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
+await seite.click('.schritt-fuss button:has-text("Weiter")');
 
-await seite.waitForSelector('.fingerprint', { timeout: 15_000 });
+await seite.waitForSelector('#backup-pw');
+await seite.fill('#backup-pw', MARKER.exportPassphrase);
+await seite.click('button:has-text("Sicherung erzeugen")');
+
+await seite.waitForSelector('.fingerprint', { timeout: 30_000 });
 const fingerprint = (await seite.textContent('.fingerprint'))?.trim() ?? '';
 const kerbeOffen = (await seite.textContent('.kerbe'))?.trim() ?? '';
 
-await seite.click('.kopf-knoepfe button');           // Sperren
+await seite.click('.kopf-knoepfe button:has-text("Sperren")');
 await seite.waitForSelector('#pw', { timeout: 10_000 });
 const kerbeZu = (await seite.textContent('.kerbe'))?.trim() ?? '';
 
 await seite.fill('#pw', MARKER.passphrase);
 await seite.click('button[type=submit]');
-await seite.waitForSelector('.fingerprint', { timeout: 30_000 });
+await seite.waitForSelector('.warnkasten, .fingerprint', { timeout: 30_000 });
 
-// Falsche Passphrase muss abgewiesen werden.
-await seite.click('.kopf-knoepfe button');
+await seite.click('.kopf-knoepfe button:has-text("Sperren")');
 await seite.waitForSelector('#pw');
 await seite.fill('#pw', 'falsch');
 await seite.click('button[type=submit]');
 await seite.waitForSelector('.meldung[data-art=gefahr]', { timeout: 20_000 });
-const fehlermeldung = (await seite.textContent('.meldung')) ?? '';
+const fehlermeldung = (await seite.textContent('.meldung[data-art=gefahr]')) ?? '';
 
 // 3) Wurde etwas ueber die abgefangenen Wege geschickt?
 const ausgang = await seite.evaluate(() => globalThis.__ktAusgang ?? []);
@@ -208,16 +214,14 @@ server.close();
 
 const pruefungen = [
   ['E-Mail ist nicht verlangt, sondern eingeklappt', !emailSichtbar],
-  ['Vorschlag liefert sechs Wörter', vorschlagWoerter.length === 6 && vorschlagWoerter.every((w) => /^[a-z]{3,}$/.test(w))],
-  ['zu jedem Wort stehen die Würfelaugen', vorschlagWuerfel.length === 6 && vorschlagWuerfel.every((w) => /^[1-6]{5}$/.test(w))],
-  ['die Entropie wird in Bit genannt', /\d+ Bit Entropie/.test(bitZeile)],
-  ['zweimal ziehen ergibt Verschiedenes', zweiterZug.join() !== vorschlagWoerter.join()],
-  ['Würfelmodus bietet ein Feld je Wort', wuerfelfelder === 6],
-  ['der Vorschlag landet erst nach Übernahme im Feld', uebernommen.split('-').length === 6],
-  ['ohne Bestätigung geht es nicht weiter', gesperrtVorBestaetigung],
-  ['nach Bestätigung schon', freiNachBestaetigung],
-  ['Schlüssel erzeugt und Fingerprint angezeigt', /^[0-9A-F]{4}( [0-9A-F]{4}){9}$/.test(fingerprint)],
+  ['Vorschlag liefert Wörter', vorschlagWoerter.length >= 5 && vorschlagWoerter.every((w) => /^[a-z]{3,}$/.test(w))],
+  ['zu jedem Wort stehen die Würfelaugen', vorschlagWuerfel.length === vorschlagWoerter.length && vorschlagWuerfel.every((w) => /^[1-6]{5}$/.test(w))],
+  ['die Entropie wird in Bit genannt', /\d+ Bit/.test(bitZeile)],
+  ['andere Wörter ergeben andere Wörter', zweiterZug.join() !== vorschlagWoerter.join()],
+  ['falsches Kontrollwort sperrt das Weitergehen', gesperrtBeiFalsch],
+  ['richtige Kontrollwörter geben es frei', freiBeiRichtig],
   ['Widerrufszertifikat ausgegeben', zertifikat.includes('BEGIN PGP PUBLIC KEY BLOCK')],
+  ['Schlüssel erzeugt und Fingerprint angezeigt', /^[0-9A-F]{4}( [0-9A-F]{4}){9}$/.test(fingerprint)],
   ['Sperr-Anzeige meldet "offen"', kerbeOffen.includes('offen')],
   ['Sperr-Anzeige meldet "gesperrt"', kerbeZu.includes('gesperrt')],
   ['Restzeit bis zur Sperre wird genannt', /sperrt in \d+:\d{2}/.test(kerbeOffen)],

@@ -4,60 +4,101 @@ import './ui/stil.css';
 import { CryptoClient } from './crypto/client.ts';
 import type { VaultStatus } from './crypto/protocol.ts';
 import { el, suche } from './ui/dom.ts';
+import { Navigation } from './ui/nav.ts';
+import { Router, type Weg } from './ui/router.ts';
 import { Schlosskerbe } from './ui/schlosskerbe.ts';
+import { AnlegenAblauf } from './ui/views/anlegen.ts';
+import { ExportAnsicht } from './ui/views/export.ts';
+import { infoAnsicht } from './ui/views/info.ts';
 import { SchluesselAnsicht } from './ui/views/schluessel.ts';
 
 const client = CryptoClient.erzeuge();
+const router = new Router();
 const kerbe = new Schlosskerbe();
-const ansicht = new SchluesselAnsicht(client);
+const bereich = el('main', { class: 'haupt', id: 'haupt' });
+
+const nav = new Navigation((weg) => { router.gehe(weg); });
+
+const schluessel = new SchluesselAnsicht({
+  client,
+  beiAnlegen: () => { ablauf = null; router.gehe({ ziel: 'neu', schritt: 1 }); },
+  beiExport: (fingerprint) => { router.gehe({ ziel: 'export', kurz: fingerprint.slice(-16) }); },
+  beiInfo: () => { router.gehe({ ziel: 'info' }); },
+});
+
+const exportAnsicht = new ExportAnsicht({
+  client,
+  beiZurueck: () => { router.gehe({ ziel: 'schluessel' }); },
+});
+
+/** Der Ablauf lebt nur, solange er läuft — mit ihm die Passphrase im Speicher. */
+let ablauf: AnlegenAblauf | null = null;
+
+function ablaufHolen(): AnlegenAblauf {
+  ablauf ??= new AnlegenAblauf({
+    client,
+    beiSchritt: (schritt) => { router.gehe({ ziel: 'neu', schritt }); },
+    beiFertig: () => { ablauf = null; router.gehe({ ziel: 'schluessel' }); },
+    beiAbbruch: () => { ablauf = null; router.gehe({ ziel: 'schluessel' }); },
+  });
+  return ablauf;
+}
+
+// ------------------------------------------------------------------- Rahmen
 
 function kopfzeile(): HTMLElement {
+  // Die Wortmarke führt nach Hause statt auf "#" zu zeigen und nichts zu tun.
+  const marke = el('button', { class: 'wortmarke', type: 'button', text: 'klartext', 'aria-label': 'klartext — zur Übersicht' });
+  marke.addEventListener('click', () => { router.gehe({ ziel: 'schluessel' }); });
+
   const sperren = el('button', { class: 'knopf still', type: 'button', text: 'Sperren' });
   sperren.addEventListener('click', () => { void client.sperre('manual'); });
 
   const thema = el('button', {
-    class: 'knopf still',
-    type: 'button',
-    text: 'Thema',
+    class: 'knopf still', type: 'button', text: 'Thema',
     'aria-label': 'Zwischen hellem und dunklem Thema wechseln',
   });
   thema.addEventListener('click', wechsleThema);
 
-  return el(
-    'header',
-    { class: 'kopf' },
-    el('a', { class: 'wortmarke', href: '#', 'aria-label': 'klartext — Startseite' }, 'klartext'),
-    kerbe.wurzel,
-    el('div', { class: 'kopf-knoepfe' }, sperren, thema),
-  );
+  // Die Sperranzeige ist selbst bedienbar: anklicken sperrt bzw. springt zur
+  // Eingabe. Eine Anzeige, die aussieht wie ein Bedienelement, sollte eines sein.
+  kerbe.wurzel.addEventListener('click', () => {
+    if (client.status.state === 'unlocked') void client.sperre('manual');
+    else document.querySelector<HTMLInputElement>('#pw')?.focus();
+  });
+
+  return el('header', { class: 'kopf' },
+    marke, kerbe.wurzel,
+    el('div', { class: 'kopf-knoepfe' }, sperren, thema));
 }
 
 function fusszeile(): HTMLElement {
-  return el(
-    'footer',
-    { class: 'fuss' },
-    el('p', { text: `© ${String(new Date().getFullYear())} Martin Pfeffer | ` }, el('a', { href: 'https://celox.io', text: 'celox.io' })),
-  );
+  const grenzen = el('button', { class: 'fuss-link', type: 'button', text: 'Was klartext nicht kann' });
+  grenzen.addEventListener('click', () => { router.gehe({ ziel: 'info' }); });
+
+  return el('footer', { class: 'fuss' },
+    grenzen,
+    el('p', { text: `© ${String(new Date().getFullYear())} Martin Pfeffer | ` },
+      el('a', { href: 'https://celox.io', text: 'celox.io' })));
 }
 
 /**
- * Themawechsel als Kreis-Aufblende ueber die View-Transitions-API.
+ * Themawechsel als Kreis-Aufblende.
  *
- * ⚠️ Der Standard-Uebergang des Browsers MUSS dabei abgeschaltet werden. Sonst
- *    blendet er old und new zusaetzlich ineinander und legt sie mit
- *    `mix-blend-mode: plus-lighter` uebereinander — zwei volle Bilder addieren
- *    sich dann zu einer ausgewaschenen Flaeche, und im Kreis steht die falsche
- *    Farbe. Die Regeln dafuer stehen in stil.css unter `.thema-wechsel`.
+ * ⚠️ Der Standard-Übergang des Browsers MUSS abgeschaltet werden, sonst blendet
+ *    er old und new zusätzlich ineinander und legt sie mit `plus-lighter`
+ *    übereinander — zwei volle Bilder addieren sich zu einer ausgewaschenen
+ *    Fläche. Die Regeln stehen in stil.css unter `.thema-wechsel`.
  */
 function wechsleThema(ereignis: MouseEvent): void {
   const wurzel = document.documentElement;
   const neu = aktuellesThema() === 'dunkel' ? 'hell' : 'dunkel';
-
   const anwenden = (): void => { wurzel.dataset['theme'] = neu; };
 
-  const reduziert = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduziert || !('startViewTransition' in document)) { anwenden(); return; }
-
+  if (globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches || !('startViewTransition' in document)) {
+    anwenden();
+    return;
+  }
   const x = ereignis.clientX;
   const y = ereignis.clientY;
   const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
@@ -65,7 +106,6 @@ function wechsleThema(ereignis: MouseEvent): void {
   wurzel.style.setProperty('--kt-reveal-y', `${String(y)}px`);
   wurzel.style.setProperty('--kt-reveal-r', `${String(radius)}px`);
   wurzel.classList.add('thema-wechsel');
-
   const uebergang = document.startViewTransition(anwenden);
   void uebergang.finished.finally(() => { wurzel.classList.remove('thema-wechsel'); });
 }
@@ -76,14 +116,46 @@ function aktuellesThema(): 'hell' | 'dunkel' {
   return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'hell' : 'dunkel';
 }
 
-function haupt(): HTMLElement {
-  return el('main', { class: 'haupt', id: 'haupt' }, ansicht.wurzel);
+// ------------------------------------------------------------------ Anzeige
+
+function setzeInhalt(knoten: HTMLElement): void {
+  while (bereich.firstChild !== null) bereich.removeChild(bereich.firstChild);
+  bereich.appendChild(knoten);
 }
+
+async function zeige(weg: Weg): Promise<void> {
+  nav.markiere(weg);
+  const status = client.status;
+
+  if (weg.ziel === 'info') { setzeInhalt(infoAnsicht()); return; }
+
+  // Anlegen und Exportieren setzen einen entsperrten (bzw. leeren) Bund voraus.
+  if (weg.ziel === 'neu') {
+    if (status.state === 'locked') { router.ersetze({ ziel: 'schluessel' }); return; }
+    const a = ablaufHolen();
+    setzeInhalt(a.wurzel);
+    a.zeigeSchritt(weg.schritt);
+    return;
+  }
+
+  if (weg.ziel === 'export') {
+    if (status.state !== 'unlocked') { router.ersetze({ ziel: 'schluessel' }); return; }
+    setzeInhalt(exportAnsicht.wurzel);
+    await exportAnsicht.zeichne(weg.kurz);
+    return;
+  }
+
+  setzeInhalt(schluessel.wurzel);
+  await schluessel.zeichne(status);
+}
+
+// -------------------------------------------------------------------- Start
 
 async function starte(): Promise<void> {
   const wurzel = suche('#app');
   wurzel.appendChild(kopfzeile());
-  wurzel.appendChild(haupt());
+  wurzel.appendChild(nav.wurzel);
+  wurzel.appendChild(bereich);
   wurzel.appendChild(fusszeile());
 
   await client.ladeEinstellungen();
@@ -92,13 +164,17 @@ async function starte(): Promise<void> {
   let letzterZustand: VaultStatus['state'] | null = null;
   client.beobachte((status) => {
     kerbe.zeige(status);
-    // Nur bei echtem Zustandswechsel neu zeichnen — sonst reisst jeder
-    // Auto-Lock-Tick dem Nutzer das Formular unter den Fingern weg.
+    // „Sperren" nur zeigen, wenn es etwas zu sperren gibt. Ein Knopf, der
+    // nichts tut, ist schlimmer als keiner — er behauptet eine Möglichkeit.
+    document.querySelector('.kopf-knoepfe button')?.classList.toggle('weg', status.state !== 'unlocked');
+
     if (status.state !== letzterZustand) {
       letzterZustand = status.state;
-      void ansicht.zeichne(status);
+      void zeige(router.aktuell);
     }
   });
+
+  router.starte((weg) => { void zeige(weg); });
   await client.aktualisiereStatus();
 }
 
