@@ -15,13 +15,14 @@
   "scripts": {
     "dev": "npm run dev --workspace @klartext/app",
     "build": "npm run build --workspace @klartext/app",
+    "reproduzierbar": "node tools/reproduzierbar.mjs",
     "preview": "npm run preview --workspace @klartext/app",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "fixtures": "bash tools/gen-gpg-fixtures.sh",
     "audit:ci": "npm audit --audit-level=high",
-    "test:alles": "npm run build && npm run test && npm run e2e && npm run wege && npm run offline && npm run qr && npm run relay && npm run a11y",
+    "test:alles": "npm run build && npm run test && npm run e2e && npm run wege && npm run offline && npm run qr && npm run relay && npm run a11y && npm run reproduzierbar",
     "e2e": "node tools/e2e/nichts-verlaesst-den-browser.mjs",
     "a11y": "node tools/e2e/zugaenglichkeit.mjs",
     "pruefe": "npm run lint && npm run typecheck && npm run test",
@@ -29,7 +30,8 @@
     "offline": "node tools/e2e/offline.mjs",
     "qr": "node tools/e2e/qr.mjs",
     "relay:build": "tsc -p relay/tsconfig.build.json && rm -rf relay/dist/src",
-    "relay": "npm run relay:build && node tools/e2e/relay.mjs"
+    "relay": "npm run relay:build && node tools/e2e/relay.mjs",
+    "kopfzeilen": "node tools/e2e/kopfzeilen.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -423,3 +423,16 @@ describe('Der Server sieht nichts', () => {
     expect(readFileSync(dbPfad, 'latin1')).not.toContain(kennzeichen);
   });
 });
+
+describe('Bindung', () => {
+  it('horcht ohne HOST nur auf der Schleife', () => {
+    // ⚠️ Der Wert ist konfigurierbar, damit der Dienst in einem Container
+    //    überhaupt erreichbar ist (dort IST 127.0.0.1 die Container-Schleife).
+    //    Die VORGABE darf sich nie ändern: ein versehentlich offener
+    //    Zustellserver wäre genau der Fehler, den die Architektur ausschliesst.
+    const quelle = readFileSync(new URL('../src/server.ts', import.meta.url), 'utf8');
+    expect(quelle).toMatch(/process\.env\['HOST'\] \?\? '127\.0\.0\.1'/);
+    // Und wer ihn umstellt, bekommt es zu lesen.
+    expect(quelle).toMatch(/horcht auf \$\{host\}/);
+  });
+});

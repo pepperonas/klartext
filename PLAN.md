@@ -1,8 +1,9 @@
 # PLAN.md — `klartext`
 
 > Status: **Bestätigt und in Umsetzung.**
-> Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 1.5 (Benutzbarkeit) ✅ · Phase 4 ✅
-> Phase 5 (Härtung) offen. Stand: 2026-08-19
+> **Alle Phasen umgesetzt.**
+> Phase 1 ✅ · 2 ✅ · 3 ✅ · 1.5 (Benutzbarkeit) ✅ · 4 (Relay) ✅ · 5 (Härtung) ✅
+> Stand: 2026-08-19
 
 ---
 

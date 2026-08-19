@@ -86,8 +86,11 @@ export const FARBEN_HELL = {
  * traegt die Typografie das Motiv, hier waere sie Ballast ohne Nutzen.
  */
 export const SCHRIFT = {
-  'schrift-text': "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  'schrift-mono': "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+  // ⚠️ Der Ersatzstapel bleibt vollständig stehen. Er trägt die Seite, solange
+  //    die Schrift lädt (font-display: swap), und dauerhaft für alles ausserhalb
+  //    des lateinischen Schnitts — siehe public/schriften/HERKUNFT.md.
+  'schrift-text': "'Inter var', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  'schrift-mono': "'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
 } as const;
 
 export const MASSE = {

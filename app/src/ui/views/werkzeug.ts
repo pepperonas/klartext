@@ -13,6 +13,12 @@
 import type { CryptoClient } from '../../crypto/client.ts';
 import type { Erkennung, KeyInfo, SignaturBefund, VaultStatus } from '../../crypto/protocol.ts';
 import { kopierKnopf } from '../components/kopieren.ts';
+import {
+  GROSS_AB_BYTES,
+  frageZiel,
+  kannAufPlatteSchreiben,
+  legeAb,
+} from '../datei-ziel.ts';
 import { zeigeMitZerfall } from '../components/zerfall.ts';
 import { el, ersetze } from '../dom.ts';
 import { fehlertext, lade } from './schluessel.ts';
@@ -372,11 +378,25 @@ export class WerkzeugAnsicht {
 
   async #datei(datei: File): Promise<void> {
     const verschluesselt = /\.(gpg|pgp|asc)$/i.test(datei.name);
-    if (datei.size > 100 * 1024 * 1024) {
+
+    // ⚠️ Das Ziel wird VOR der Arbeit erfragt, nicht danach: showSaveFilePicker
+    //    verlangt eine frische Nutzergeste, und die verfällt nach wenigen
+    //    Sekunden. Nach dem Verschlüsseln einer grossen Datei wäre sie
+    //    zuverlässig abgelaufen — also ausgerechnet dort, wo der direkte Weg
+    //    auf die Platte etwas bringt.
+    const grossesZiel =
+      datei.size > GROSS_AB_BYTES && kannAufPlatteSchreiben()
+        ? await frageZiel(verschluesselt ? datei.name.replace(/\.(gpg|pgp|asc)$/i, '') : `${datei.name}.gpg`)
+        : null;
+
+    const mb = String(Math.round(datei.size / 1024 / 1024));
+    if (datei.size > GROSS_AB_BYTES) {
       this.#melde(
-        `Die Datei ist ${String(Math.round(datei.size / 1024 / 1024))} MB groß. Sie wird dabei ` +
-        'vollständig in den Arbeitsspeicher geladen — auf einem knappen Gerät kann der Tab das ' +
-        'übelnehmen. Es läuft trotzdem los.',
+        grossesZiel !== null
+          ? `${mb} MB. Das Ergebnis geht direkt auf die Platte — das spart die zweite Kopie im ` +
+            'Arbeitsspeicher. Die Datei selbst wird trotzdem als Ganzes verarbeitet.'
+          : `Die Datei ist ${mb} MB groß. Sie wird vollständig in den Arbeitsspeicher geladen — ` +
+            'auf einem knappen Gerät kann der Tab das übelnehmen. Es läuft trotzdem los.',
         'warnung');
     } else {
       this.#melde(verschluesselt ? 'Wird entschlüsselt…' : 'Wird verschlüsselt…', 'neutral');
@@ -389,16 +409,16 @@ export class WerkzeugAnsicht {
           return;
         }
         const e = await this.#client.ruf('datei.entschluessele', { datei, pruefeMit: [] });
-        ladeBinaer(e.dateiname, e.daten);
-        this.#melde(`Entschlüsselt: ${e.dateiname}${signaturKurz(e.signaturen)}`, 'gut');
+        const wohin = await legeAb(grossesZiel, e.daten, () => { ladeBinaer(e.dateiname, e.daten); });
+        this.#melde(`Entschlüsselt: ${e.dateiname}${wohin}${signaturKurz(e.signaturen)}`, 'gut');
       } else {
         const { anFingerprints, anArmored } = this.#empfaengerListe();
         const e = await this.#client.ruf('datei.verschluessele', {
           datei, anFingerprints, anArmored,
           signiereMit: this.#signieren && this.#status === 'unlocked' ? this.#standardFingerprint() : null,
         });
-        ladeBinaer(e.dateiname, e.daten);
-        this.#melde(`Verschlüsselt: ${e.dateiname}`, 'gut');
+        const wohin = await legeAb(grossesZiel, e.daten, () => { ladeBinaer(e.dateiname, e.daten); });
+        this.#melde(`Verschlüsselt: ${e.dateiname}${wohin}`, 'gut');
       }
     } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }

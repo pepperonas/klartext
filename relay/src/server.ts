@@ -263,7 +263,26 @@ function alsAntwort(nachrichten: readonly { id: string; blob: string; created_at
 if (/[/\\]server\.(ts|js)$/.test(process.argv[1] ?? '')) {
   const app = baueServer({ datenbank: process.env['KLARTEXT_DB'] ?? './data/relay.db' });
   const port = Number(process.env['PORT'] ?? 4265);
-  app.listen({ port, host: '127.0.0.1' }).catch((fehler: unknown) => {
+
+  // ⚠️ Die Vorgabe ist 127.0.0.1 und bleibt es. Der Dienst gehört hinter einen
+  //    Webserver, der ihn unter DERSELBEN Herkunft wie die App weiterreicht —
+  //    die CSP der App lautet `connect-src 'self'`, alles andere lehnt der
+  //    Browser ab, bevor eine Anfrage hinausgeht.
+  //
+  //    Umstellbar ist es trotzdem, denn in einem Container ist 127.0.0.1 die
+  //    Container-Schleife: der Dienst wäre von aussen unerreichbar und die
+  //    Portweiterleitung liefe ins Leere. Wer HOST setzt, tut es also bewusst;
+  //    ein Test hält fest, dass die VORGABE sich nie ändert.
+  const host = process.env['HOST'] ?? '127.0.0.1';
+  if (host !== '127.0.0.1' && host !== '::1') {
+    process.stderr.write(
+      `Achtung: der Zustellserver horcht auf ${host}, nicht nur auf der Schleife. ` +
+        'Das ist nur richtig, wenn davor ein Webserver steht, der ihn unter derselben ' +
+        'Herkunft wie die App ausliefert.\n',
+    );
+  }
+
+  app.listen({ port, host }).catch((fehler: unknown) => {
     process.stderr.write(`Start fehlgeschlagen: ${String(fehler)}\n`);
     process.exit(1);
   });

@@ -1,0 +1,38 @@
+# Der Zustellserver (Modus B). Siehe deploy/README.md.
+#
+# ⚠️ Der Dienst horcht ABSICHTLICH nur auf 127.0.0.1. Er gehört hinter den
+#    Webserver, der auch die App ausliefert — unter derselben Herkunft, sonst
+#    verbietet die CSP der App die Verbindung. Wer hier `0.0.0.0` einträgt,
+#    stellt einen Dienst ins Netz, der nie dafür gedacht war.
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4265:4265"
+    environment:
+      # Im Container muss auf allen Schnittstellen gehorcht werden, damit die
+      # Portweiterleitung oben greift — nach aussen bindet Docker trotzdem nur
+      # an 127.0.0.1.
+      HOST: "0.0.0.0"
+      PORT: "4265"
+      # ⚠️ Der Server liest KLARTEXT_DB, nicht DATA_DIR. Ein erfundener
+      #    Variablenname wäre stillschweigend wirkungslos gewesen.
+      KLARTEXT_DB: "/opt/klartext-relay/data/relay.db"
+    volumes:
+      - relay-daten:/opt/klartext-relay/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  # ⚠️ Dieses Volumen gehört NICHT in eine Sicherung. Es hält ausschliesslich
+  #    Ciphertext mit sieben Tagen Verfallszeit; eine Kopie würde genau die
+  #    Verfallszeit aushebeln, die der Dienst zusagt.
+  relay-daten:

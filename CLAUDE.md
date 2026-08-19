@@ -318,6 +318,9 @@ npm run pruefe       # lint + typecheck + Tests  (vor jedem Commit)
 npm run test:alles   # build + Tests + E2E + Zugänglichkeit
 npm run e2e          # "nichts verlässt den Browser" im echten Chromium
 npm run a11y         # WCAG 2.1 A+AA über 6 Zustände (3 × 2 Themen)
+npm run relay        # Zustellung über zwei echte Browser gegen ein gebautes Relay
+npm run reproduzierbar  # zweimal bauen, Byte für Byte vergleichen
+npm run kopfzeilen   # Kopfzeilen der LAUFENDEN Seite (nach jedem Deploy)
 npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 ```
 
@@ -350,7 +353,9 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `wortabgleich.test.ts` | Fingerprint ↔ Wörter, über tausend Werte umkehrbar. |
 | `einladung.test.ts` | Nutzlast im Fragment, Ablauf, Länge, kein Vorbeilesen am Puffer. |
 | `kontakte.test.ts` | Schlüsselwechsel wird gemeldet, nie stillschweigend übernommen. |
-| `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit. |
+| `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit, Baukennung ↔ `build.json` ↔ Dateien, Reihenfolge der Nutzergeste. |
+| `build-kennung.test.ts` | Die Kennung kommt vom Server — also geprüfte Form oder gar nichts. |
+| `datei-ziel.test.ts` | Der Weg auf die Platte, vor allem: jeder Fehlweg endet im Blob-Rückfall. |
 
 **Regeln fürs Testschreiben in diesem Repo:**
 
@@ -504,11 +509,97 @@ erklärt hätte. Eine grüne Mutationsprobe kann auch heißen, dass die Mutation
 Gegenstand vorbeigeht. Die Probe muss die Eigenschaft treffen, die der Test
 behauptet.
 
+## Der Build-Hash macht Grenze 1 überprüfbar — mehr nicht
+
+Threat-Model Nr. 1 lautet: der Server liefert bei jedem Aufruf den Code aus, der
+die Schlüssel anfasst. Dagegen hilft keine Technik im Browser. Was hilft, ist
+**nachrechnen können**:
+
+* `tools/build-hash.mjs` schreibt beim Bauen `build.json` (ein SHA-256 je
+  ausgelieferter Datei plus ein Gesamt-Hash über Namen *und* Inhalte) und trägt
+  den Gesamt-Hash als `<meta>` in die index.html. Der Info-Screen zeigt die
+  ersten zwölf Stellen.
+* `npm run reproduzierbar` baut zweimal von Grund auf und vergleicht. Ohne diese
+  Messung wäre der Hash eine Behauptung.
+* `integrity` steht an allem, was direkt im Markup hängt (Einstiegspunkt,
+  `modulepreload`, Stylesheet).
+
+⚠️ **Was das NICHT ist.** Die Zahl steht in derselben Datei, die der Server
+geschickt hat — ein Server, der falschen Code ausliefert, kann auch eine falsche
+Zahl ausliefern. Der Wert liegt darin, dass eine Abweichung *überhaupt* auffallen
+kann: bei halbem Deploy, kaputtem Zwischenspeicher, und für jeden, der von aussen
+nachrechnet. Der Info-Screen sagt genau das, mit dem Befehl daneben. Eine
+Selbstprüfung im Browser gibt es bewusst nicht — eine Prüfung, die der Geprüfte
+selbst durchführt, ist keine.
+
+⚠️ SRI deckt **nicht** ab: den Krypto-Worker (`new Worker()` kennt kein
+`integrity`), dynamisch nachgeladene Chunks (SRI erbt sich nicht) und den
+Service Worker. Dafür ist `build.json` da.
+
+## Kopfzeilen werden an der laufenden Seite gemessen
+
+`tests/vertrag.test.ts` hält die CSP an drei Stellen im Repo deckungsgleich. Das
+sagt nichts darüber, ob der Server sie auch anwendet — und genau dort ist schon
+etwas durchgerutscht (der Deploy, der TLS abräumte). `npm run kopfzeilen` misst
+deshalb gegen die echte Seite: CSP Direktive für Direktive, HSTS, Referrer,
+Permissions-Policy, dazu Baukennung, `integrity` und ob eine ausgelieferte Datei
+wirklich zu ihrem Eintrag in `build.json` passt.
+
+⚠️ Beim ersten Lauf hätte dieser Test beinahe selbst falsch beruhigt: der vhost
+hat einen SPA-Rückfall auf index.html, also antwortet er auf eine **fehlende**
+Datei mit HTTP 200 und HTML. `response.ok` war wahr, `build.json` war nicht da.
+Jetzt wird zusätzlich der `content-type` geprüft.
+
+## Grosse Dateien: die zweite Kopie fällt weg, nicht die erste
+
+Ab 64 MB fragt die Oberfläche über die File System Access API nach einem Ziel und
+schreibt direkt dorthin. Das spart die Blob-Kopie — bei einer halben Gigabyte
+ist das der Unterschied zwischen „geht" und „der Tab stirbt".
+
+⚠️ **Kein Streaming.** Die Verschlüsselung reicht das ganze Ergebnis als
+`Uint8Array` über die Worker-Grenze; die Datei liegt weiterhin vollständig im
+Speicher. Gespart wird die zweite Kopie. Die Oberfläche behauptet auch nichts
+anderes.
+
+⚠️ **`showSaveFilePicker()` verlangt eine frische Nutzergeste** (wenige
+Sekunden). Wer den Dialog erst *nach* dem Verschlüsseln öffnet, bekommt bei
+grossen Dateien verlässlich einen `SecurityError` — also ausgerechnet dort, wo
+der direkte Weg etwas bringt. Deshalb wird das Ziel **vorher** erfragt; ein Pin
+in `vertrag.test.ts` hält die Reihenfolge fest.
+
+⚠️ Jeder Fehlweg endet im Blob-Rückfall: abgebrochen, Geste verfallen, Platte
+voll, Ort weg. Eine fertig entschlüsselte Datei darf daran nicht verlorengehen.
+Das liess sich **nicht** mit einem Textvergleich sichern (nach der Mutation stand
+der Rückfall immer noch daneben, nur unerreichbar — der Test blieb grün), also
+liegt die Logik in `ui/datei-ziel.ts` und wird im Verhalten geprüft.
+
+## Eigene Schriften
+
+Inter (variabel) und JetBrains Mono, beide OFL, auf Latin-1 zugeschnitten:
+zusammen 122 kB statt 352 kB allein für Inter. Herkunft, Lizenz und der
+Zuschnitt-Befehl in `app/public/schriften/HERKUNFT.md`.
+
+⚠️ Der Schnitt ist **bewusst nicht enger**. Die Proportionalschrift zeigt auch
+entschlüsselte fremde Texte und Kontaktnamen; ein engerer Schnitt liesse
+einzelne Zeichen mitten im Absatz auf die Systemschrift zurückfallen. Der
+Ersatzstapel bleibt vollständig stehen — er trägt die Seite, solange geladen
+wird (`font-display: swap`, nicht `block`: eine Krypto-App, die drei Sekunden
+leere Kästen zeigt, während man eine Fehlermeldung erwartet, ist schlechter als
+eine, die kurz in der Systemschrift erscheint).
+
+⚠️ `crossorigin` gehört auch bei gleicher Herkunft an den Vorabruf — Schriften
+werden immer im CORS-Modus geholt, ohne das Attribut lädt der Browser die Datei
+zweimal.
+
+⚠️ **Breitenmessung taugt hier nicht als Nachweis:** JetBrains Mono und die
+System-Festbreitenschrift haben beide 0,6 em Vorschub, 19 Zeichen ergeben in
+beiden Fällen exakt 1140 px. Ich hätte eine Übereinstimmung gemessen, die nichts
+über die geladene Schrift sagt. `document.fonts.check()` beantwortet die Frage
+direkt; die Gewichtsachse zeigt sich dagegen sehr wohl in der Breite (991 → 1084).
+
 ## Was noch nicht da ist
 
-* **Eigene Schriften** (Inter + JetBrains Mono, OFL, auf Latein reduziert).
-  Läuft weiter auf Systemschriften — der Typwechsel Proportional/Monospace
-  trägt das Motiv auch so, das Subsetting steht noch aus.
-* **Härtung/Build-Hash im UI** (Phase 5). Der Relay läuft seit Phase 4.
-* Dateien laufen durch den Arbeitsspeicher, nicht auf die Platte: die File
-  System Access API fehlt noch, ab 100 MB warnt die Oberfläche ehrlich.
+* Echtes Streaming grosser Dateien durch den Worker (siehe oben — heute fällt
+  nur die zweite Kopie weg).
+* Ein Off-Site-Stand des Relays gibt es absichtlich nicht; die Datenbank ist
+  flüchtig und aus den Schlüsseln der Nutzer wiederherstellbar.

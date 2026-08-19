@@ -4,10 +4,50 @@
  * Der Masterprompt verlangt, dass die Grenzen aus THREAT-MODEL.md von der
  * Startseite aus in einem Tipp erreichbar sind. Das ist kein Kleingedrucktes:
  * eine App, die Sicherheit verspricht, muss zuerst sagen, wo das Versprechen
- * aufhört. Die acht Punkte stehen hier im Wortlaut des Dokuments.
+ * aufhört. Die Punkte stehen hier im Wortlaut des Dokuments; ein Test hält
+ * fest, dass es genauso viele sind wie dort.
  */
 
+import { buildKennung, kurzform } from '../../build-kennung.ts';
 import { el } from '../dom.ts';
+
+/**
+ * Zeigt, welcher Bau gerade läuft — und sagt in einem Satz, was das wert ist.
+ *
+ * ⚠️ Die Versuchung wäre, hier „geprüft" oder „verifiziert" zu schreiben.
+ *    Geprüft hat niemand: die Zahl steht in derselben Datei, die der Server
+ *    geschickt hat. Sie ist ein Vergleichswert, kein Nachweis — und der Text
+ *    sagt genau das, samt dem Befehl, mit dem man es von aussen nachrechnet.
+ */
+function baustand(): HTMLElement {
+  const kennung = buildKennung();
+  if (kennung === null) {
+    return el('section', { class: 'karte' },
+      el('h3', { text: 'Welcher Bau läuft hier?' }),
+      el('p', {
+        text:
+          'Diese Fassung trägt keine Baukennung — sie läuft aus dem Entwicklungsserver. ' +
+          'Der ausgelieferte Stand auf klartext.celox.io trägt eine.',
+      }));
+  }
+
+  return el('section', { class: 'karte' },
+    el('h3', { text: 'Welcher Bau läuft hier?' }),
+    el('p', { class: 'fingerprint', text: kurzform(kennung) }),
+    el('p', {
+      text:
+        'Der Quelltext liegt offen, und zwei Bauläufe aus demselben Stand ergeben ' +
+        'Byte für Byte dieselben Dateien. Wer nachrechnen will, baut das Repo und ' +
+        'vergleicht mit dem, was der Server schickt:',
+    }),
+    el('pre', { class: 'befehl', text: 'curl -s https://klartext.celox.io/build.json' }),
+    el('p', { class: 'hinweis' },
+      el('strong', { text: 'Das ist ein Vergleichswert, kein Nachweis. ' }),
+      'Ein Server, der dir falschen Code schickt, kann dir auch eine falsche Zahl ' +
+      'schicken. Sie taugt dazu, eine Abweichung zu bemerken — von aussen, oder wenn ' +
+      'etwas versehentlich auseinanderläuft. Gegen einen Server, der dich gezielt ' +
+      'belügt, hilft nur GnuPG auf einem Rechner, den du selbst kontrollierst.'));
+}
 
 interface Grenze {
   readonly titel: string;
@@ -123,6 +163,8 @@ export function infoAnsicht(): HTMLElement {
     ...GRENZEN.map((g, i) => el('section', { class: 'karte grenze' },
       el('h3', {}, el('span', { class: 'grenze-nr', text: String(i + 1) }), g.titel),
       el('p', { text: g.text }))),
+
+    baustand(),
 
     el('section', { class: 'karte' },
       el('h3', { text: 'Bewusst nicht gelöst' }),

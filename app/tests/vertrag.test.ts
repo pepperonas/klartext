@@ -7,7 +7,8 @@
  * Dateien liegt.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -315,6 +316,63 @@ describe('Wortlaut', () => {
       expect(gefunden.length, `„${t}" hat kein Gegenstück im THREAT-MODEL`)
         .toBeGreaterThanOrEqual(Math.max(1, Math.ceil(tragend.length / 2)));
     }
+  });
+
+  it('der gebaute Stand traegt Kennung, integrity und ein Dateiverzeichnis', () => {
+    // ⚠️ Diese drei gehoeren zusammen: die Kennung ist der kurze Vergleichswert,
+    //    build.json die vollstaendige Liste, integrity der Riegel fuer das,
+    //    was direkt im Markup steht. Faellt eines weg, ist Grenze 1 des
+    //    Threat-Models wieder unpruefbar — und zwar ohne dass etwas kaputtgeht.
+    const dist = join(WURZEL, 'app', 'dist');
+    if (!existsSync(join(dist, 'index.html'))) return; // ohne Bau nichts zu pruefen
+
+    const html = readFileSync(join(dist, 'index.html'), 'utf8');
+    expect(html).toMatch(/<meta name="klartext-build" content="sha256-[A-Za-z0-9+/]{43}=" \/>/);
+    // Mindestens Einstiegspunkt und Stylesheet.
+    expect((html.match(/integrity="sha256-/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    // ⚠️ Doppelte Attribute sind ungueltiges Markup — Vite setzt crossorigin
+    //    bereits selbst, das Werkzeug darf es nicht ein zweites Mal schreiben.
+    for (const tag of html.match(/<(?:script|link)[^>]*>/g) ?? []) {
+      expect((tag.match(/\bcrossorigin\b/g) ?? []).length, tag).toBeLessThanOrEqual(1);
+    }
+
+    const bau = JSON.parse(readFileSync(join(dist, 'build.json'), 'utf8')) as {
+      hash: string;
+      dateien: Record<string, string>;
+    };
+    expect(bau.hash).toMatch(/^sha256-[A-Za-z0-9+/]{43}=$/);
+    expect(Object.keys(bau.dateien).length).toBeGreaterThanOrEqual(5);
+    // Die Datei, die den Hash TRAEGT, kann nicht Teil des Hashes sein.
+    expect(Object.keys(bau.dateien)).not.toContain('index.html');
+    expect(Object.keys(bau.dateien)).not.toContain('build.json');
+
+    // Jeder Eintrag muss zur Datei passen — sonst beglaubigt das Verzeichnis
+    // sich selbst statt den Bau.
+    for (const [name, hash] of Object.entries(bau.dateien)) {
+      const echt = `sha256-${createHash('sha256').update(readFileSync(join(dist, name))).digest('base64')}`;
+      expect(echt, name).toBe(hash);
+    }
+  });
+
+  it('das Speicherziel wird VOR der Krypto-Arbeit erfragt', () => {
+    // ⚠️ showSaveFilePicker verlangt eine frische Nutzergeste (~5 s). Wer den
+    //    Dialog nach dem Verschlüsseln öffnet, bekommt bei grossen Dateien
+    //    verlässlich einen SecurityError — also genau dort, wo der direkte Weg
+    //    auf die Platte überhaupt etwas bringt. Die Reihenfolge IST das Merkmal.
+    const quelle = pur(lies(SRC, 'ui', 'views', 'werkzeug.ts'));
+    const frage = quelle.indexOf('frageZiel(');
+    const arbeit = quelle.indexOf("this.#client.ruf('datei.");
+    expect(frage, 'frageZiel kommt im Quelltext nicht vor').toBeGreaterThan(-1);
+    expect(arbeit).toBeGreaterThan(-1);
+    expect(frage, 'das Ziel wird erst nach der Krypto-Arbeit erfragt').toBeLessThan(arbeit);
+  });
+
+  it('die Baukennung wird nicht ungeprueft angezeigt', () => {
+    // Sie steht in einem Dokument, das vom Server kommt. Also gilt sie als
+    // fremde Eingabe, auch wenn sie „nur" angezeigt wird.
+    const quelle = pur(lies(SRC, 'build-kennung.ts'));
+    expect(quelle).toMatch(/test\(wert\)/);
+    expect(quelle).toMatch(/\^sha256-/);
   });
 
   it('der Info-Screen verspricht nichts fuer spaeter', () => {

@@ -10,6 +10,12 @@
     />
     <meta name="color-scheme" content="dark light" />
     <meta name="referrer" content="no-referrer" />
+    <!-- ⚠️ `crossorigin` ist bei Schriften auch bei gleicher Herkunft Pflicht:
+         Schriften werden immer im CORS-Modus geholt. Ohne das Attribut lädt der
+         Browser die Datei ZWEIMAL — einmal für den Vorabruf, einmal für
+         @font-face — und der Vorabruf war umsonst. -->
+    <link rel="preload" href="/schriften/inter-var-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/schriften/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0e1113" />

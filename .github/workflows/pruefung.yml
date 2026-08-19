@@ -68,6 +68,11 @@ jobs:
       - name: Zugänglichkeit
         run: npm run a11y
 
+      # Zwei echte Browser gegen ein gebautes Relay: Zustellung, Signatur und
+      # der Nachweis, dass in der Datenbank kein Klartext liegt.
+      - name: Zustellung über das Relay
+        run: npm run relay
+
   reproduzierbar:
     runs-on: ubuntu-latest
     steps:
@@ -78,14 +83,13 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Zweimal bauen, Prüfsummen vergleichen. Wer den Build-Hash im UI
-      # nachrechnen können soll, braucht einen Build, der zweimal dasselbe
-      # ergibt.
+      # Zweimal bauen und vergleichen. Wer den Build-Hash im UI nachrechnen
+      # können soll, braucht einen Bau, der zweimal dasselbe ergibt.
+      #
+      # ⚠️ Das lief hier früher als handgeschriebene sha256sum-Kette neben dem
+      #    Werkzeug her — zwei Umsetzungen derselben Aussage, von denen eine
+      #    unbemerkt veralten kann. Jetzt läuft dasselbe Werkzeug, das auch
+      #    lokal läuft; es vergleicht zusätzlich den Gesamt-Hash und meldet
+      #    Dateien, die nur in einem der beiden Läufe auftauchen.
       - name: Zweimal bauen und vergleichen
-        run: |
-          npm run build
-          find app/dist -type f -exec sha256sum {} + | sed 's|app/dist/||' | sort > /tmp/lauf1.txt
-          rm -rf app/dist
-          npm run build
-          find app/dist -type f -exec sha256sum {} + | sed 's|app/dist/||' | sort > /tmp/lauf2.txt
-          diff /tmp/lauf1.txt /tmp/lauf2.txt && echo "Build ist reproduzierbar."
+        run: npm run reproduzierbar

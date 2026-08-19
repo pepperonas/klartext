@@ -1,5 +1,39 @@
 /* Alle Farben und Masse kommen aus src/design/tokens.ts (virtual:tokens.css). */
 
+/* Eigene Schriften — Herkunft und Lizenz: public/schriften/HERKUNFT.md.
+   Selbst ausgeliefert, weil die App nichts von fremden Servern lädt; die CSP
+   (`font-src 'self'`) verbietet es ohnehin.
+
+   ⚠️ `font-display: swap` und nicht `block`: der Text muss sofort lesbar sein.
+      Eine Krypto-App, die drei Sekunden lang leere Kästen zeigt, während man
+      eine Fehlermeldung erwartet, ist schlechter als eine, die kurz in der
+      Systemschrift erscheint. Die Ersatzstapel unten bleiben deshalb stehen. */
+@font-face {
+  font-family: 'Inter var';
+  /* Der variable Schnitt deckt alle Gewichte ab — eine Datei statt sechs. */
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  src: url('/schriften/inter-var-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/schriften/jetbrains-mono-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  /* ⚠️ Eigener Schnitt statt synthetischer Fettung: der Browser würde die
+     Regular sonst verzerren, und bei einer Festbreitenschrift fällt das
+     besonders auf — die Zeichenbreite bleibt, die Striche laufen ineinander. */
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/schriften/jetbrains-mono-latin-bold.woff2') format('woff2');
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
@@ -129,6 +163,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 }
 
 .hinweis { margin: 0; font-size: 0.88rem; color: var(--kt-text-leise); }
+
+/* Ein Befehl zum Abtippen. Waagerecht rollbar statt umgebrochen: ein
+   umgebrochener Befehl wird beim Kopieren falsch. */
+.befehl {
+  font-family: var(--kt-schrift-mono);
+  font-size: 0.8rem;
+  background: var(--kt-flaeche-hoch);
+  border: 1px solid var(--kt-kontur);
+  border-radius: var(--kt-r-klein);
+  padding: var(--kt-raum-2);
+  margin: 0 0 var(--kt-raum-2);
+  overflow-x: auto;
+  user-select: all;
+}
 
 .knopfreihe { display: flex; gap: var(--kt-raum-2); flex-wrap: wrap; margin-top: var(--kt-raum-4); }
 

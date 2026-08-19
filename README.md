@@ -16,7 +16,7 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 ## Stand
 
-**Phase 1 bis 4 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
+**Alle Phasen sind umgesetzt**, dazu ein Benutzbarkeits-Durchgang.
 Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
 
 * **Schlüssel** — erzeugen, Schlüsselbund mit Passphrase-Schutz und Zeitsperre,
@@ -29,8 +29,25 @@ Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
   Adresse, der nur Ciphertext sieht; Lesen nur gegen Besitznachweis am
   privaten Schlüssel
 
-Die Härtung folgt; die Phasen stehen in
-[`PLAN.md`](PLAN.md), der Benutzbarkeits-Plan in [`PLAN-UX.md`](PLAN-UX.md).
+* **Nachprüfbarkeit** — der Bau ist reproduzierbar, jede ausgelieferte Datei
+  steht mit ihrer Prüfsumme in `build.json`, und die App zeigt, welcher Bau
+  gerade läuft
+
+Die Phasen stehen in [`PLAN.md`](PLAN.md), der Benutzbarkeits-Plan in
+[`PLAN-UX.md`](PLAN-UX.md), die Grenzen in [`THREAT-MODEL.md`](THREAT-MODEL.md).
+
+## Nachrechnen, was der Server ausliefert
+
+```sh
+git clone https://github.com/pepperonas/klartext && cd klartext
+npm ci && npm run reproduzierbar          # baut zweimal, vergleicht Byte für Byte
+curl -s https://klartext.celox.io/build.json | diff - app/dist/build.json
+```
+
+Stimmen die Prüfsummen überein, läuft dort der Code aus diesem Repo. ⚠️ Das ist
+ein Vergleichswert, kein Nachweis: ein Server, der gezielt falschen Code
+ausliefert, kann auch eine falsche Zahl ausliefern. Es macht eine Abweichung
+bemerkbar — mehr behauptet die App auch nicht.
 
 ## Zwei Betriebsarten
 
