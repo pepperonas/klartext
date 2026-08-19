@@ -70,10 +70,11 @@ function texte(k: Stub): string[] {
 }
 
 describe('Navigationsleiste', () => {
-  it('führt alle vier Bereiche in fester Reihenfolge', async () => {
+  it('führt alle Bereiche in fester Reihenfolge', async () => {
     const { Navigation } = await import('../src/ui/nav.ts');
     const nav = new Navigation(() => { /* egal */ });
-    expect(texte(nav.wurzel as unknown as Stub)).toEqual(['Schlüssel', 'Werkzeug', 'Kontakte', 'Info']);
+    expect(texte(nav.wurzel as unknown as Stub))
+      .toEqual(['Schlüssel', 'Werkzeug', 'Kontakte', 'Einstellungen', 'Info']);
   });
 
   it('alle Bereiche der Phasen 1 bis 3 sind erreichbar', async () => {
@@ -93,10 +94,10 @@ describe('Navigationsleiste', () => {
     const gewaehlt: string[] = [];
     const nav = new Navigation((w) => gewaehlt.push(w.ziel));
     const kinder = (nav.wurzel as unknown as Stub).childNodes;
-    for (const text of ['Info', 'Werkzeug', 'Kontakte', 'Schlüssel']) {
+    for (const text of ['Info', 'Werkzeug', 'Kontakte', 'Einstellungen', 'Schlüssel']) {
       kinder.find((c) => c.textContent === text)?.klicke();
     }
-    expect(gewaehlt).toEqual(['info', 'werkzeug', 'kontakte', 'schluessel']);
+    expect(gewaehlt).toEqual(['info', 'werkzeug', 'kontakte', 'einstellungen', 'schluessel']);
   });
 
   it('markiert genau einen Eintrag', async () => {
@@ -120,6 +121,8 @@ describe('Navigationsleiste', () => {
       [{ ziel: 'export' as const, kurz: 'AB' }, 'Schlüssel'],
       [{ ziel: 'einladen' as const }, 'Kontakte'],
       [{ ziel: 'empfangen' as const }, 'Kontakte'],
+      [{ ziel: 'gespraech' as const, kurz: 'AB' }, 'Kontakte'],
+      [{ ziel: 'einstellungen' as const }, 'Einstellungen'],
     ] as const;
     for (const [weg, erwartet] of faelle) {
       nav.markiere(weg);

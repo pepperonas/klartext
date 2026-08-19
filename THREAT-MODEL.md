@@ -73,7 +73,31 @@ ausrechnen und dich damit wiedererkennen.
 benutzt Modus A und schickt den Ciphertext über einen Kanal seiner Wahl. Modus A
 braucht überhaupt keinen Server.
 
-## 4. Der Browser ist die Angriffsfläche
+## 4. Der Server prüft nicht, ob das Eingeworfene verschlüsselt ist
+
+Er nimmt Bytes entgegen und legt sie ab. Ob es sich um einen PGP-Block handelt
+oder um blanken Text, kann er nicht beurteilen — und soll es auch nicht, denn
+dafür müsste er hineinsehen. Verschlüsselt wird ausschliesslich im Browser,
+**bevor** etwas den Rechner verlässt.
+
+Für dich heisst das: solange du über die App schickst, verlässt nie Klartext
+dein Gerät. Wer stattdessen von Hand etwas in ein Postfach legt, legt genau das
+ab, was er geschickt hat. (Nachgestellt: ein per `curl` eingeworfener
+Probetext lag anschliessend lesbar in der Datenbank — richtig so, und genau der
+Grund, warum die Verschlüsselung nicht Aufgabe des Servers sein darf.)
+
+**Dein Postfach steht ausserdem jedem offen, der deinen öffentlichen Schlüssel
+hat.**
+
+Das ist Absicht: die Kennung wird aus dem Fingerprint gerechnet, damit dir
+jemand schreiben kann, ohne dass es ein Verzeichnis gäbe. Wer deinen Schlüssel
+hat, kann dir also auch **unerwünscht** schreiben und dein Postfach zustellen.
+
+Begrenzt wird das durch harte Obergrenzen je Postfach (Anzahl und Gesamtgröße,
+siehe `/v1/status`) und eine Verfallszeit. Verhindert ist es nicht. *Lesen*
+dagegen erfordert immer einen Besitznachweis am privaten Schlüssel.
+
+## 5. Der Browser ist die Angriffsfläche
 
 Jede installierte Erweiterung kann grundsätzlich lesen, was auf dieser Seite
 steht — auch deine entschlüsselten Nachrichten, auch das Feld, in das du deine
@@ -88,7 +112,7 @@ außen, keine Analyse-Werkzeuge.
 Das erschwert eine Einschleusung über die App. Gegen eine bösartige Erweiterung
 in deinem eigenen Browser hilft es nicht.
 
-## 5. JavaScript kann Speicher nicht zuverlässig löschen
+## 6. JavaScript kann Speicher nicht zuverlässig löschen
 
 Die App sperrt sich nach Leerlauf (voreingestellt 15 Minuten) und wenn du den
 Tab verlässt. Dabei werden die Verweise auf das Schlüsselmaterial fallengelassen.
@@ -100,7 +124,7 @@ oder die Passphrase also noch enthalten, nachdem die App "gesperrt" anzeigt.
 
 Der Auto-Lock verkleinert das Zeitfenster. Er schließt es nicht.
 
-## 6. Fingerprints sind SHA-1
+## 7. Fingerprints sind SHA-1
 
 Ein v4-OpenPGP-Fingerprint ist 160 Bit SHA-1 — auch bei `klartext`, weil genau
 das die Kompatibilität zu jedem GnuPG herstellt. SHA-1 ist gegen
@@ -114,7 +138,7 @@ zu tun, als sei ein Fingerprint ein für alle Zeiten fester Anker.
 Wer maximale Härte will, nimmt v6-Schlüssel mit SHA-256 — und verzichtet dafür
 auf jedes GnuPG vor Version 2.5.
 
-## 7. Ein unverifizierter Kontakt kann jemand anderes sein
+## 8. Ein unverifizierter Kontakt kann jemand anderes sein
 
 Wenn du einen öffentlichen Schlüssel über einen Kanal bekommst, den ein
 Angreifer kontrolliert, kann er dir seinen eigenen unterschieben, mitlesen und
@@ -125,7 +149,7 @@ vorlesen am Telefon, QR-Code beim Treffen. Deshalb markiert `klartext`
 unverifizierte Kontakte dauerhaft — nicht nur beim Anlegen — und warnt, wenn ein
 bekannter Kontakt plötzlich mit einem neuen Schlüssel auftaucht.
 
-## 8. Die Passphrase ist die ganze Sicherheit deines Schlüsselbunds
+## 9. Die Passphrase ist die ganze Sicherheit deines Schlüsselbunds
 
 Argon2id (3 Durchgänge, 64 MiB) macht Raten teuer. Es macht es nicht unmöglich.
 Gegen "Sommer2024!" hilft kein Ableitungsverfahren der Welt.

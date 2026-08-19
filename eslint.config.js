@@ -53,6 +53,10 @@ export default tseslint.config(
         getComputedStyle: 'readonly', btoa: 'readonly', atob: 'readonly',
         OffscreenCanvas: 'readonly', TextEncoder: 'readonly', TextDecoder: 'readonly',
         window: 'readonly',
+        // `fetch` gibt es auf beiden Seiten: in Node seit 18 und im Browser
+        // ohnehin. Im *Anwendungs*code bleibt es auf relay/client.ts begrenzt —
+        // das prueft vertrag.test.ts, nicht ESLint.
+        fetch: 'readonly',
       },
     },
   },

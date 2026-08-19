@@ -10,7 +10,7 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DB_NAME, DB_VERSION, STORE_CONTACTS, STORE_KEYS, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
+import { DB_NAME, DB_VERSION, STORE_CONTACTS, STORE_KEYS, STORE_MESSAGES, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
 
 let db: IDBDatabase | null = null;
 
@@ -30,7 +30,7 @@ afterEach(() => { db?.close(); db = null; });
 describe('Anlegen', () => {
   it('legt alle Stores an', () => {
     expect([...(db?.objectStoreNames ?? [])].sort())
-      .toEqual([STORE_KEYS, STORE_SETTINGS, STORE_CONTACTS].sort());
+      .toEqual([STORE_KEYS, STORE_SETTINGS, STORE_CONTACTS, STORE_MESSAGES].sort());
   });
 
   it('führt die erwartete Version', () => {
@@ -103,6 +103,7 @@ describe('Migration', () => {
     expect([...db.objectStoreNames]).toContain(STORE_KEYS);
     expect([...db.objectStoreNames]).toContain(STORE_SETTINGS);
     expect([...db.objectStoreNames]).toContain(STORE_CONTACTS);
+    expect([...db.objectStoreNames]).toContain(STORE_MESSAGES);
   });
 
   it('rüstet einen Bestand von Version 1 auf 2 nach — ohne Datenverlust', async () => {
@@ -132,8 +133,37 @@ describe('Migration', () => {
 
     db = await oeffne();
     expect(db.version).toBe(DB_VERSION);
+    // Beide später hinzugekommenen Stores müssen da sein — das Durchfallen im
+    // switch ist genau dafür da.
     expect([...db.objectStoreNames]).toContain(STORE_CONTACTS);
+    expect([...db.objectStoreNames]).toContain(STORE_MESSAGES);
     const zeile = await lies<{ label: string }>(db, STORE_KEYS, 'ALT');
     expect(zeile?.label).toBe('Bestandsschlüssel');
+  });
+
+  it('rüstet auch von Version 2 nach — der Zwischenstand aus Phase 3', async () => {
+    db?.close();
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => { resolve(); };
+      req.onerror = () => { resolve(); };
+      req.onblocked = () => { resolve(); };
+    });
+    const alt = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 2);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore(STORE_KEYS, { keyPath: 'fingerprint' });
+        req.result.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
+        req.result.createObjectStore(STORE_CONTACTS, { keyPath: 'fingerprint' });
+      };
+      req.onsuccess = () => { resolve(req.result); };
+      req.onerror = () => { reject(req.error ?? new Error('offen fehlgeschlagen')); };
+    });
+    await schreibe(alt, STORE_CONTACTS, { fingerprint: 'KONTAKT', name: 'Rosa' });
+    alt.close();
+
+    db = await oeffne();
+    expect([...db.objectStoreNames]).toContain(STORE_MESSAGES);
+    expect((await lies<{ name: string }>(db, STORE_CONTACTS, 'KONTAKT'))?.name).toBe('Rosa');
   });
 });

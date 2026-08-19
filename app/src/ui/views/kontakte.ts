@@ -30,18 +30,21 @@ function knopfMit(text: string, beiKlick: () => void, klasse = ''): HTMLButtonEl
 export interface KontakteOptionen {
   readonly client: CryptoClient;
   readonly beiEinladen: () => void;
+  readonly beiGespraech: (fingerprint: string) => void;
 }
 
 export class KontakteAnsicht {
   readonly wurzel = el('div', { class: 'ansicht' });
   readonly #client: CryptoClient;
   readonly #beiEinladen: () => void;
+  readonly #beiGespraech: (fingerprint: string) => void;
   #meldung = el('p', { class: 'meldung', role: 'status', 'aria-live': 'polite' });
   #schritt: 'liste' | 'pruefen' | 'wechsel' = 'liste';
 
   constructor(optionen: KontakteOptionen) {
     this.#client = optionen.client;
     this.#beiEinladen = optionen.beiEinladen;
+    this.#beiGespraech = optionen.beiGespraech;
   }
 
   async zeichne(status: VaultStatus): Promise<void> {
@@ -124,8 +127,9 @@ export class KontakteAnsicht {
       }),
 
       el('div', { class: 'knopfreihe' },
+        knopfMit('Schreiben', () => { this.#beiGespraech(kontakt.fingerprint); }, 'haupt'),
         knopfMit(verifiziert ? 'Erneut abgleichen' : 'Fingerprint abgleichen',
-          () => { this.#zeigeVerifikation(kontakt); }, verifiziert ? '' : 'haupt'),
+          () => { this.#zeigeVerifikation(kontakt); }),
         knopfMit('Schlüssel geben', () => { void this.#gibSchluessel(kontakt); }),
         knopfMit('Entfernen', () => { void this.#loesche(kontakt); })));
   }

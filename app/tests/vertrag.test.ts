@@ -133,17 +133,67 @@ describe('Trennung von Main-Thread und Krypto', () => {
 });
 
 describe('Keine stillen Kanäle', () => {
-  it('kein fetch, kein XMLHttpRequest, kein WebSocket im Quelltext', () => {
-    // klartext spricht mit niemandem. Modus B (Phase 4) bekommt dafür einen
-    // eigenen, klar benannten Ort — bis dahin darf hier nichts stehen.
+  it('das Netz wird an GENAU EINER Stelle angesprochen', () => {
+    // Seit Phase 4 gibt es Modus B — und damit einen Ort, der fetch benutzt.
+    // Der Wächter wird dadurch nicht schwächer, sondern schärfer: es ist
+    // ausgerechnet EINE Datei, und sie heisst so, dass man sie findet.
     const suender: string[] = [];
     for (const datei of alleTs(SRC)) {
       const p = pur(lies(datei));
       if (/\bfetch\s*\(|XMLHttpRequest|new WebSocket|EventSource|sendBeacon/.test(p)) {
-        suender.push(relative(SRC, datei));
+        suender.push(relative(SRC, datei).split('\\').join('/'));
       }
     }
-    expect(suender).toEqual([]);
+    expect(suender).toEqual(['relay/client.ts']);
+  });
+
+  it('der Relay-Client verschickt nur, was ihm gereicht wird', () => {
+    // ⚠️ Die erste Fassung suchte nach dem Wort „klartext" als Ersatz für
+    //    „Klartext" — im Deutschen ist das Wort für unverschlüsselten Text
+    //    aber dasselbe wie der Name der App. Die Prüfung war damit
+    //    bedeutungslos und schlug beim ersten Satz an, der die App erwähnt.
+    //
+    //    Aussagekräftig ist stattdessen: der Client kennt keine Kryptografie,
+    //    kein Schlüsselmaterial und keine Passphrase. Er reicht durch.
+    const client = pur(lies(SRC, 'relay', 'client.ts'));
+    expect(client).not.toMatch(/openpgp/);
+    expect(client).not.toMatch(/\bpassphrase\b/i);
+    expect(client).not.toMatch(/privat(er|e)?[A-Za-z]*Schluessel|PrivateKey/);
+    // Alles, was in einen Rumpf geschrieben wird, kommt aus einem Parameter.
+    for (const treffer of client.matchAll(/JSON\.stringify\(\{([^}]*)\}\)/g)) {
+      const felder = (treffer[1] ?? '').split(',').map((f) => f.trim()).filter(Boolean);
+      for (const feld of felder) {
+        expect(['blob', 'kennung', 'schluessel', 'nonce', 'signatur', 'ids'], feld).toContain(feld);
+      }
+    }
+  });
+
+  it('der Relay-Client gibt nichts preis, was er nicht muss', () => {
+    const client = pur(lies(SRC, 'relay', 'client.ts'));
+    expect(client).toMatch(/credentials: 'omit'/);
+    expect(client).toMatch(/referrerPolicy: 'no-referrer'/);
+    expect(client).toMatch(/cache: 'no-store'/);
+  });
+
+  it('spricht ausschliesslich die eigene Herkunft an', () => {
+    // Die CSP erlaubt `connect-src 'self'`. Der Client prüft das zusätzlich
+    // selbst, damit in den Einstellungen nichts landet, das nie geht.
+    const client = pur(lies(SRC, 'relay', 'client.ts'));
+    expect(client).toMatch(/pruefeHerkunft/);
+    expect(client).toMatch(/url\.origin !== new URL\(eigeneHerkunft\)\.origin/);
+    expect(lies(WURZEL, 'deploy', 'nginx-klartext.conf')).toMatch(/location \/relay\//);
+  });
+
+  it('App und Relay leiten die Postfach-Kennung gleich ab', () => {
+    // ⚠️ Weichen die Präfixe voneinander ab, schreibt ein Absender in ein
+    //    Postfach, das der Empfänger nie abfragt — und niemand bekommt eine
+    //    Fehlermeldung. Das fiele erst im Betrieb auf.
+    const appSeite = lies(SRC, 'relay', 'kennung.ts');
+    const relaySeite = lies(WURZEL, 'relay', 'src', 'postfach.ts');
+    for (const konstante of ['klartext-mailbox-v1|', 'klartext-relay-auth:v1:']) {
+      expect(appSeite, konstante).toContain(konstante);
+      expect(relaySeite, konstante).toContain(konstante);
+    }
   });
 
   it('kein Analyse-Werkzeug, keine Telemetrie', () => {
@@ -219,10 +269,19 @@ describe('Wortlaut', () => {
     expect(gefunden.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('der Info-Screen nennt alle acht Grenzen aus dem Threat-Model', () => {
+  it('der Info-Screen nennt jede nummerierte Grenze aus dem Threat-Model', () => {
+    // ⚠️ Vorher stand hier die feste Zahl 8. Eine getippte Zahl ist keine
+    //    Verknüpfung: sie sagt nur, dass sich die App nicht geändert hat, nicht
+    //    dass sie zum Dokument passt. Jetzt kommt die Erwartung aus dem
+    //    Dokument selbst — wer dort einen Punkt ergänzt, wird an die App
+    //    erinnert, und umgekehrt.
     const info = lies(SRC, 'ui', 'views', 'info.ts');
-    const anzahl = (info.match(/^\s*titel:/gm) ?? []).length;
-    expect(anzahl).toBe(8);
+    const modell = lies(WURZEL, 'THREAT-MODEL.md');
+    const abschnitte = (modell.match(/^## \d+\. /gm) ?? []).length;
+    const eintraege = (info.match(/^\s*titel:/gm) ?? []).length;
+    expect(abschnitte).toBeGreaterThanOrEqual(8);
+    expect(eintraege, 'Info-Screen und THREAT-MODEL zählen verschieden')
+      .toBe(abschnitte);
   });
 
   it('THREAT-MODEL.md und Info-Screen behandeln dieselben Themen', () => {
@@ -233,5 +292,35 @@ describe('Wortlaut', () => {
     ]) {
       expect(modell, thema).toContain(thema.split(' ')[0] ?? thema);
     }
+  });
+
+  it('jede Grenze aus dem Info-Screen steht auch im THREAT-MODEL', () => {
+    // ⚠️ Die erste Fassung prüfte nur, ob ein paar Stichwörter im Dokument
+    //    vorkommen. Das ließ die beiden Seiten auseinanderlaufen: im
+    //    Info-Screen stand noch „kommt in Phase 4", als Phase 4 längst lief.
+    //    Jetzt wird jeder Titel der App im Dokument gesucht — an seinen
+    //    tragenden Wörtern, damit eine Umformulierung nicht sofort rot wird,
+    //    ein *neuer* Punkt ohne Gegenstück aber schon.
+    const modell = lies(WURZEL, 'THREAT-MODEL.md').toLowerCase();
+    const info = lies(SRC, 'ui', 'views', 'info.ts');
+    const titel = [...info.matchAll(/titel: '([^']+)'/g)].map((t) => t[1] ?? '');
+    expect(titel.length).toBeGreaterThanOrEqual(8);
+
+    for (const t of titel) {
+      const tragend = t
+        .toLowerCase()
+        .split(/[^a-zäöüß0-9-]+/)
+        .filter((w) => w.length > 5);
+      const gefunden = tragend.filter((w) => modell.includes(w));
+      expect(gefunden.length, `„${t}" hat kein Gegenstück im THREAT-MODEL`)
+        .toBeGreaterThanOrEqual(Math.max(1, Math.ceil(tragend.length / 2)));
+    }
+  });
+
+  it('der Info-Screen verspricht nichts fuer spaeter', () => {
+    // Ein Hinweis auf eine kommende Phase ist ab dem Tag falsch, an dem sie
+    // fertig ist — und niemand liest den Info-Screen danach noch einmal.
+    const info = lies(SRC, 'ui', 'views', 'info.ts');
+    expect(info).not.toMatch(/kommt in Phase|folgt in Phase|ab Phase|demn(ae|ä)chst/i);
   });
 });

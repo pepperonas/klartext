@@ -22,6 +22,8 @@ export type Weg =
   | { readonly ziel: 'einladen' }
   /** Empfangene Einladung. Die Nutzlast steht im Fragment, nie im Pfad. */
   | { readonly ziel: 'empfangen' }
+  | { readonly ziel: 'gespraech'; readonly kurz: string }
+  | { readonly ziel: 'einstellungen' }
   | { readonly ziel: 'info' };
 
 export const START: Weg = { ziel: 'schluessel' };
@@ -35,6 +37,8 @@ export function alsPfad(weg: Weg): string {
     case 'kontakte': return '/kontakte';
     case 'einladen': return '/einladen';
     case 'empfangen': return EINLADUNG_PFAD;
+    case 'gespraech': return `/gespraech/${weg.kurz}`;
+    case 'einstellungen': return '/einstellungen';
     case 'info': return '/info';
   }
 }
@@ -48,6 +52,8 @@ export function ausPfad(pfad: string): Weg {
   if (erstes === 'kontakte') return { ziel: 'kontakte' };
   if (erstes === 'einladen') return { ziel: 'einladen' };
   if (erstes === 'e') return { ziel: 'empfangen' };
+  if (erstes === 'einstellungen') return { ziel: 'einstellungen' };
+  if (erstes === 'gespraech' && zweites !== undefined) return { ziel: 'gespraech', kurz: zweites };
   if (erstes === 'neu') {
     const schritt = Number(zweites ?? '1');
     return { ziel: 'neu', schritt: Number.isInteger(schritt) && schritt > 0 ? schritt : 1 };

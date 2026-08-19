@@ -1,8 +1,8 @@
 # PLAN.md — `klartext`
 
 > Status: **Bestätigt und in Umsetzung.**
-> Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 1.5 (Benutzbarkeit) ✅
-> Phase 4 (Relay) und 5 (Härtung) offen. Stand: 2026-08-19
+> Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 1.5 (Benutzbarkeit) ✅ · Phase 4 ✅
+> Phase 5 (Härtung) offen. Stand: 2026-08-19
 
 ---
 
@@ -25,7 +25,7 @@ Alle Empfehlungen aus Phase 0 sind übernommen:
 | 9c | Web Push | **nein** |
 | 10 | Analytics/Umami | **nein**, ausdrücklich nicht |
 
-Ohne Rückfrage entschieden: nginx · `listen 443 ssl http2;` (nginx 1.24) · npm-Workspaces · TypeScript **6.0.3** · Relay-Port **4264** · Zustellung siehe §5.3.
+Ohne Rückfrage entschieden: nginx · `listen 443 ssl http2;` (nginx 1.24) · npm-Workspaces · TypeScript **6.0.3** · Relay-Port **4265** · Zustellung siehe §5.3.
 
 ---
 
@@ -60,7 +60,7 @@ nicht unter den Teppich — siehe §7.
               │
               │  nur bei Modus B, nur Ciphertext
               ▼
-┌─ Relay (VPS, :4264 loopback) ────────────────────────────────────────────┐
+┌─ Relay (VPS, :4265 loopback) ────────────────────────────────────────────┐
 │  Fastify + SQLite(WAL).  Tabelle: (mailbox_id, blob, created, expires)   │
 │  Kein Klarname, keine IP-Logs, keine Public Keys im Ruhezustand.         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -278,7 +278,7 @@ unvermeidbares Restrisiko und steht als solches im Threat-Model.
   IP/URL/Body; nginx `access_log off` für die API-Location.
 - ⚠️ **Backup-Ausschluss (sonst ist die TTL eine Lüge):** dein `vps-data-backup.sh` sucht SQLite-DBs
   *dynamisch* — die Relay-DB liefe automatisch mit und gelöschte Nachrichten überlebten einen Monat
-  in `/var/backups`. Phase 5 trägt einen expliziten Ausschluss ein. Die Relay-DB wird **nicht**
+  in `/var/backups`. Der Ausschluss steht seit Phase 4 in `vps-data-backup.sh`. Die Relay-DB wird **nicht**
   gesichert; sie enthält ausschließlich Flüchtiges.
 
 ---

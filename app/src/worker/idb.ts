@@ -5,11 +5,12 @@
  */
 
 export const DB_NAME = 'klartext';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const STORE_KEYS = 'keys';
 export const STORE_SETTINGS = 'settings';
 export const STORE_CONTACTS = 'contacts';
+export const STORE_MESSAGES = 'messages';
 
 function warte<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -40,7 +41,11 @@ export function oeffne(): Promise<IDBDatabase> {
           db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
         case 1:
           db.createObjectStore(STORE_CONTACTS, { keyPath: 'fingerprint' });
-        // Phase 4 hängt hier `case 2:` für 'messages' an.
+        case 2: {
+          const nachrichten = db.createObjectStore(STORE_MESSAGES, { keyPath: 'id' });
+          // Nach Gesprächspartner und Zeit — so wird die Ansicht gelesen.
+          nachrichten.createIndex('kontakt', ['kontaktFp', 'zeit']);
+        }
       }
       /* eslint-enable no-fallthrough */
     };

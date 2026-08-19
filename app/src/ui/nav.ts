@@ -20,6 +20,7 @@ const EINTRAEGE: readonly Eintrag[] = [
   { text: 'Schlüssel', ziel: { ziel: 'schluessel' } },
   { text: 'Werkzeug', ziel: { ziel: 'werkzeug' } },
   { text: 'Kontakte', ziel: { ziel: 'kontakte' } },
+  { text: 'Einstellungen', ziel: { ziel: 'einstellungen' } },
   { text: 'Info', ziel: { ziel: 'info' } },
 ];
 
@@ -54,8 +55,10 @@ export class Navigation {
     // Leiste dort wie ein fremder Ort.
     const aktiv =
       weg.ziel === 'info' ? 'info'
+      : weg.ziel === 'einstellungen' ? 'einstellungen'
       : weg.ziel === 'werkzeug' ? 'werkzeug'
-      : weg.ziel === 'kontakte' || weg.ziel === 'einladen' || weg.ziel === 'empfangen' ? 'kontakte'
+      : weg.ziel === 'kontakte' || weg.ziel === 'einladen' || weg.ziel === 'empfangen'
+        || weg.ziel === 'gespraech' ? 'kontakte'
       : 'schluessel';
     for (const [name, knopf] of this.#knoepfe) {
       const an = name === aktiv;

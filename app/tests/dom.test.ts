@@ -159,16 +159,29 @@ describe('Zusicherung über den gesamten Quelltext', () => {
   });
 
   it('nirgends ein fremder Server', () => {
-    const erlaubt = /celox\.io|openpgpjs\.org|w3\.org|github\.com|example|invalid|fixture/;
+    // ⚠️ Nur ECHTE Hostnamen zählen. Die erste Fassung schlug auf `https://…`
+    //    an — dem Platzhaltertext eines Eingabefelds. Ein Wächter mit
+    //    Fehlalarmen wird irgendwann abgeschaltet, und dann bewacht er nichts.
+    const erlaubt = /celox\.io|openpgpjs\.org|w3\.org|github\.com|example|invalid|fixture|localhost|127\.0\.0\.1/;
+    const echterHost = /^https?:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9-]+)+/i;
     const suender: string[] = [];
     for (const datei of alleTs(SRC)) {
       const pur = readFileSync(datei, 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '');
       for (const treffer of pur.matchAll(/https?:\/\/[^\s'"`)]+/g)) {
-        if (!erlaubt.test(treffer[0])) suender.push(`${datei}: ${treffer[0]}`);
+        const url = treffer[0];
+        if (!echterHost.test(url)) continue;
+        if (!erlaubt.test(url)) suender.push(`${datei}: ${url}`);
       }
     }
     expect(suender).toEqual([]);
+  });
+
+  it('die Suche nach fremden Servern beisst noch', () => {
+    // Gegenprobe zur Ausnahme oben.
+    const echterHost = /^https?:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9-]+)+/i;
+    expect(echterHost.test('https://boeswillig.example.net/sammeln')).toBe(true);
+    expect(echterHost.test('https://…')).toBe(false);
   });
 });

@@ -16,7 +16,7 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 ## Stand
 
-**Phase 1 bis 3 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
+**Phase 1 bis 4 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
 Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
 
 * **Schlüssel** — erzeugen, Schlüsselbund mit Passphrase-Schutz und Zeitsperre,
@@ -25,8 +25,11 @@ Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
   offline-fähig als installierbare App
 * **Kontakte** — Einladungslinks, QR-Codes, Fingerprint-Abgleich in dreizehn
   deutschen Wörtern, Warnung bei Schlüsselwechsel
+* **Zustellung** (freiwillig) — ein eigener Briefkasten unter derselben
+  Adresse, der nur Ciphertext sieht; Lesen nur gegen Besitznachweis am
+  privaten Schlüssel
 
-Relay und die Härtung folgen; die Phasen stehen in
+Die Härtung folgt; die Phasen stehen in
 [`PLAN.md`](PLAN.md), der Benutzbarkeits-Plan in [`PLAN-UX.md`](PLAN-UX.md).
 
 ## Zwei Betriebsarten
@@ -35,7 +38,7 @@ Relay und die Härtung folgen; die Phasen stehen in
 kommt ein ASCII-Block, den du über einen beliebigen Kanal schickst — Signal,
 Mail, Matrix. Braucht keinen Server und keine Verbindung.
 
-**Modus B — Relay** (freiwillig, Phase 4). Ein eigener Zustellserver als
+**Modus B — Relay** (freiwillig, voreingestellt aus). Ein eigener Zustellserver als
 Briefkasten, der nur Ciphertext sieht. Das ist **Bequemlichkeit, kein
 Sicherheitsgewinn**, und die App sagt das an der Stelle, an der man es
 einschaltet.

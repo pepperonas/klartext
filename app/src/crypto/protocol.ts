@@ -62,11 +62,33 @@ export interface VaultSettings {
   readonly autoLockMinutes: number;
   /** Karenz in Sekunden nach Tab-Wechsel. 0 = sofort, -1 = nie sperren. */
   readonly lockOnHiddenSeconds: number;
+
+  /**
+   * Modus B — der Zustellserver.
+   *
+   * ⚠️ Voreingestellt AUS. Er ist eine Bequemlichkeit, kein Sicherheitsgewinn;
+   *    Modus A braucht keinen Server. Wer ihn einschaltet, soll das bewusst tun
+   *    und dabei gelesen haben, was er über einen mitbekommt.
+   */
+  readonly relayAktiv: boolean;
+  readonly relayUrl: string;
+  /**
+   * Lesetoken je Postfach-Kennung.
+   *
+   * ⚠️ Liegt UNVERSCHLÜSSELT in IndexedDB. Es berechtigt zum Abholen und
+   *    Löschen von Ciphertext im eigenen Postfach — nicht zum Entschlüsseln.
+   *    Wer die Browserdatenbank in die Hand bekommt, hat ohnehin den
+   *    (verschlüsselten) privaten Schlüssel. Das steht so im Threat-Model.
+   */
+  readonly relayTokens: Readonly<Record<string, string>>;
 }
 
 export const STANDARD_EINSTELLUNGEN: VaultSettings = {
   autoLockMinutes: 15,
   lockOnHiddenSeconds: 30,
+  relayAktiv: false,
+  relayUrl: '',
+  relayTokens: {},
 };
 
 /** Ergebnis einer Schluesselerzeugung. Der private Teil bleibt im Worker. */
@@ -173,6 +195,18 @@ export interface Ops {
   'kontakte.schluessel': { req: { fingerprint: string }; res: { armored: string } };
   /** Eigener öffentlicher Schlüssel binär — für den Einladungslink. */
   'keys.exportBinaer': { req: { fingerprint: string }; res: { daten: Uint8Array } };
+
+  /** Signiert die Postfach-Herausforderung — braucht den privaten Schlüssel. */
+  'relay.signiere': {
+    req: { fingerprint: string; text: string };
+    res: { signatur: string; schluessel: string };
+  };
+
+  'verlauf.liste': { req: { kontaktFp: string }; res: readonly EntfaltetesGespraech[] };
+  'verlauf.lege': { req: { eintrag: VerlaufsEintrag }; res: readonly EntfaltetesGespraech[] };
+  'verlauf.loesche': { req: { kontaktFp: string }; res: readonly EntfaltetesGespraech[] };
+  /** Wie viele ungelesene je Kontakt — für die Kontaktliste. */
+  'verlauf.zaehler': { req: Record<never, never>; res: Readonly<Record<string, number>> };
 }
 
 /** Was in einem eingefügten Block steckt — Grundlage der Werkzeug-Ansicht. */
@@ -260,6 +294,34 @@ export type KontaktAufnahme =
       readonly kontakt: Kontakt;
       readonly bisher: Kontakt;
     };
+
+export type Richtung = 'ein' | 'aus';
+
+/**
+ * Eine Nachricht im lokalen Verlauf.
+ *
+ * ⚠️ Gespeichert wird der CIPHERTEXT, nicht der Klartext — und zwar ohne
+ *    zusätzliche Schicht: eine Nachricht an mich ist per Definition an meinen
+ *    Schlüssel verschlüsselt, eine von mir nehme ich als Empfänger mit auf.
+ *    Der Verlauf ist damit im Ruhezustand verschlüsselt, ohne dass irgendwo
+ *    eigene Kryptografie dazukäme. Lesen setzt einen entsperrten Bund voraus.
+ */
+export interface VerlaufsEintrag {
+  readonly id: string;
+  readonly kontaktFp: string;
+  readonly richtung: Richtung;
+  readonly ciphertext: string;
+  readonly zeit: number;
+  readonly zugestellt: boolean;
+}
+
+export interface EntfaltetesGespraech {
+  readonly eintrag: VerlaufsEintrag;
+  /** Klartext, falls entschlüsselbar; sonst null mit Begründung. */
+  readonly klartext: string | null;
+  readonly fehler: string | null;
+  readonly signaturen: readonly SignaturBefund[];
+}
 
 export type Op = keyof Ops;
 export type ReqBody<K extends Op> = Ops[K]['req'];

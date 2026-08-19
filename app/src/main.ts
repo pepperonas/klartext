@@ -10,7 +10,10 @@ import { Router, type Weg } from './ui/router.ts';
 import { Schlosskerbe } from './ui/schlosskerbe.ts';
 import { AnlegenAblauf } from './ui/views/anlegen.ts';
 import { ExportAnsicht } from './ui/views/export.ts';
+import { Postfach } from './relay/postfach.ts';
 import { EinladungAnsicht } from './ui/views/einladung.ts';
+import { EinstellungenAnsicht } from './ui/views/einstellungen.ts';
+import { GespraechAnsicht } from './ui/views/gespraech.ts';
 import { infoAnsicht } from './ui/views/info.ts';
 import { KontakteAnsicht } from './ui/views/kontakte.ts';
 import { SchluesselAnsicht } from './ui/views/schluessel.ts';
@@ -35,9 +38,22 @@ const werkzeug = new WerkzeugAnsicht({
   beiEntsperren: () => { router.gehe({ ziel: 'schluessel' }); },
 });
 
+const postfach = new Postfach(client);
+
 const kontakte = new KontakteAnsicht({
   client,
   beiEinladen: () => { router.gehe({ ziel: 'einladen' }); },
+  beiGespraech: (fingerprint) => { router.gehe({ ziel: 'gespraech', kurz: fingerprint.slice(-16) }); },
+});
+
+const gespraech = new GespraechAnsicht({
+  client, postfach,
+  beiZurueck: () => { router.gehe({ ziel: 'kontakte' }); },
+});
+
+const einstellungen = new EinstellungenAnsicht({
+  client,
+  beiInfo: () => { router.gehe({ ziel: 'info' }); },
 });
 
 const einladung = new EinladungAnsicht({
@@ -148,9 +164,25 @@ async function zeige(weg: Weg): Promise<void> {
   // ⚠️ Ein weiterlaufender Kamerastrom hinter einer verlassenen Ansicht wäre
   //    unentschuldbar. Beim Wegnavigieren wird er ausdrücklich abgeschaltet.
   if (weg.ziel !== 'kontakte') kontakte.verlasse();
+  // ⚠️ Ebenso die Langabfrage: eine offene Verbindung hinter einer verlassenen
+  //    Ansicht verrät dem Server Anwesenheit, die ihn nichts angeht.
+  if (weg.ziel !== 'gespraech') gespraech.verlasse();
   const status = client.status;
 
   if (weg.ziel === 'info') { setzeInhalt(infoAnsicht()); return; }
+
+  if (weg.ziel === 'einstellungen') {
+    setzeInhalt(einstellungen.wurzel);
+    await einstellungen.zeichne();
+    return;
+  }
+
+  if (weg.ziel === 'gespraech') {
+    if (status.state !== 'unlocked') { router.ersetze({ ziel: 'schluessel' }); return; }
+    setzeInhalt(gespraech.wurzel);
+    await gespraech.zeichne(weg.kurz);
+    return;
+  }
 
   if (weg.ziel === 'kontakte') {
     setzeInhalt(kontakte.wurzel);

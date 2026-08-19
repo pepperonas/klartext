@@ -651,3 +651,49 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .scanbereich { display: flex; flex-direction: column; gap: var(--kt-raum-3); margin-top: var(--kt-raum-3); }
 .scanner { border-radius: var(--kt-r-mittel); overflow: hidden; background: var(--kt-bg); }
 .scanner-bild { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; object-fit: cover; }
+
+/* -------------------------------------------------------------- Gespräch */
+
+.modus-zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--kt-raum-3);
+  flex-wrap: wrap;
+  padding: var(--kt-raum-3) var(--kt-raum-4);
+  border: 1px solid var(--kt-kontur);
+  border-radius: var(--kt-r-mittel);
+}
+
+.verlauf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-3);
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: var(--kt-raum-2);
+  margin-bottom: var(--kt-raum-4);
+}
+
+.blase {
+  padding: var(--kt-raum-3) var(--kt-raum-4);
+  border-radius: var(--kt-r-mittel);
+  background: var(--kt-flaeche-hoch);
+  max-width: 85%;
+}
+.blase.eigen { align-self: flex-end; background: var(--kt-akzent-schwach); }
+.blase-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kt-raum-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--kt-raum-2);
+  font-size: 0.78rem;
+  color: var(--kt-text-leise);
+}
+.blase-wer { font-weight: 600; color: var(--kt-text); }
+.blase-zeit { font-variant-numeric: tabular-nums; }
+/* Klartext bleibt Proportionalschrift — der Typwechsel ist der Zustandsanzeiger. */
+.blase-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.blase-text.fehler { color: var(--kt-gefahr); font-style: italic; }
+
+.pille.klein { font-size: 0.68rem; padding: 1px var(--kt-raum-2); }

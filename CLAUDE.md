@@ -451,11 +451,64 @@ Kryptobibliothek drinstecken" — deshalb ist sie jetzt **relativ**: der
 Einstiegspunkt muss unter einem Viertel des Chunks liegen, der openpgp
 nachweislich enthält. Damit wächst sie mit.
 
+**Der Deploy einer nginx-Datei kann TLS abräumen.** Die Repo-Fassung endete mit
+einem Kommentar „certbot trägt hier listen/ssl_certificate ein" — die Zeilen
+standen also nur auf dem Server. Ein `scp` der Datei hat sie gelöscht: der vhost
+horchte danach nur noch auf Port 80, HTTPS fiel auf den Standard-Server durch,
+und der Browser zeigte ein gültiges Zertifikat für eine **völlig fremde Domain**
+(`ERR_CERT_COMMON_NAME_INVALID` — derselbe Fehler, den der Nutzer schon einmal
+gemeldet hatte; er war nie behoben, nur überdeckt). `nginx -t` sagt dazu nichts,
+denn die Datei ist syntaktisch tadellos. Die TLS-Zeilen stehen jetzt **im Repo**,
+inklusive `listen 443 ssl http2;` (nginx 1.24 kennt `http2 on;` nicht) und einem
+eigenen Port-80-Block, dessen ACME-Ort **vor** der Weiterleitung steht. Regel:
+was ein Deploy überschreibt, muss vollständig im Repo stehen — sonst ist der
+Server die Quelle der Wahrheit, und die überlebt keinen Deploy.
+
+**Einen Dienst zu starten ist nicht dasselbe wie ihn laufen zu sehen.** Der Relay
+lief zuerst auf Port 4264, wo bereits gunicorn horchte. `systemctl enable --now`
+meldete nichts, `is-active` sagte `activating` — nicht `failed`, weil `Restart=`
+den Dienst alle fünf Sekunden neu warf. Er hätte sich beliebig lange so gedreht.
+Die Portliste in der Haus-Doku war nicht aktuell (4263 war frei laut Doku, in
+Wirklichkeit belegt). Also: Port selbst erheben
+(`ss -tlnp | grep -oE '127\.0\.0\.1:4[0-9]{3}' | sort -u`), und nach dem Start
+den **Zustand** prüfen, nicht den Rückgabewert des Startbefehls. Jetzt: **4265**.
+
+**Die Relay-Datenbank gehört NICHT in die Nachtsicherung.** Sie hält nur
+Ciphertext mit sieben Tagen Verfallszeit und `secure_delete = ON`. Die
+VPS-Routine sammelt SQLite-Dateien unter `/opt` automatisch ein — sie hätte
+Kopien angelegt, die die Verfallszeit um Monate überdauern, in einem Archiv, das
+die App nicht kontrolliert. Ausnahme steht in `vps-data-backup.sh`. ⚠️ Dabei
+selbst hineingetappt: die eingefügte Zeile endete auf `\\` statt `\`. In bash ist
+das kein Umbruch, sondern ein Backslash als Argument — `bash -n` findet das
+nicht, denn es ist gültige Syntax mit falscher Bedeutung. Erst der **Probelauf
+der Funktion** zeigte es (14 Datenbanken gesichert, klartext nicht dabei).
+
+**Der Server prüft nicht, ob das Eingeworfene verschlüsselt ist.** Nachgestellt
+mit `curl`: ein blanker Probetext lag danach lesbar in der Datenbank. Das ist
+richtig — dafür müsste er hineinsehen — aber es gehört gesagt, und steht jetzt im
+THREAT-MODEL und im Info-Screen. Der E2E-Test „die Datenbank enthält KEINEN
+Klartext" trägt trotzdem, weil dort die **App** verschlüsselt, bevor etwas geht.
+
+**Eine getippte Zahl ist keine Verknüpfung.** Der Test „der Info-Screen nennt
+alle acht Grenzen" pinnte die Acht als Literal — er sagte damit nur, dass sich
+die App nicht geändert hat, nicht dass sie zum THREAT-MODEL passt. Deshalb
+konnte im Info-Screen „kommt in Phase 4" stehen bleiben, als Phase 4 lief. Die
+Erwartung kommt jetzt aus dem Dokument (`## \d+\.`-Abschnitte zählen), dazu ein
+Wächter gegen Versprechen für später. Mutationsprobe: einen Eintrag entfernen
+⇒ rot.
+
+**Und der Gegenbefund zur Mutationsprobe:** meine erste Probe für genau diesen
+Test war *falsch gewählt* (ich benannte einen Titel um, statt die Anzahl zu
+ändern) und blieb folgerichtig grün — worauf ich den Test beinahe für untauglich
+erklärt hätte. Eine grüne Mutationsprobe kann auch heißen, dass die Mutation am
+Gegenstand vorbeigeht. Die Probe muss die Eigenschaft treffen, die der Test
+behauptet.
+
 ## Was noch nicht da ist
 
 * **Eigene Schriften** (Inter + JetBrains Mono, OFL, auf Latein reduziert).
   Läuft weiter auf Systemschriften — der Typwechsel Proportional/Monospace
   trägt das Motiv auch so, das Subsetting steht noch aus.
-* **Relay** (Phase 4) und **Härtung/Build-Hash im UI** (Phase 5).
+* **Härtung/Build-Hash im UI** (Phase 5). Der Relay läuft seit Phase 4.
 * Dateien laufen durch den Arbeitsspeicher, nicht auf die Platte: die File
   System Access API fehlt noch, ab 100 MB warnt die Oberfläche ehrlich.

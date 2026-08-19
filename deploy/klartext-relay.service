@@ -1,0 +1,50 @@
+# /etc/systemd/system/klartext-relay.service
+#
+# Der Zustellserver (Modus B). Läuft als eigener Nutzer unter einer engen
+# systemd-Sandbox — er nimmt fremde Daten entgegen und hat nichts zu suchen
+# ausserhalb seines Datenverzeichnisses.
+
+[Unit]
+Description=klartext Zustellserver (Modus B)
+After=network.target
+
+[Service]
+Type=simple
+User=klartext
+Group=klartext
+WorkingDirectory=/opt/klartext-relay
+Environment=NODE_ENV=production
+Environment=PORT=4265
+Environment=KLARTEXT_DB=/opt/klartext-relay/data/relay.db
+ExecStart=/usr/bin/node /opt/klartext-relay/dist/server.js
+Restart=on-failure
+RestartSec=5
+
+# ⚠️ Ohne UMask legt der Dienst seine Datenbank welt-lesbar an. Sie enthält
+#    zwar nur Ciphertext — aber „nur Ciphertext" ist kein Grund, ihn jedem
+#    Konto auf der Maschine hinzulegen.
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=/opt/klartext-relay/data
+
+[Install]
+WantedBy=multi-user.target

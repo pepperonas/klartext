@@ -36,10 +36,19 @@ const GRENZEN: readonly Grenze[] = [
   {
     titel: 'Das Relay sieht Metadaten, auch wenn es den Inhalt nicht sieht',
     text:
-      'Der Zustellserver (Modus B, freiwillig, kommt in Phase 4) speichert nur Postfach-Kennung, ' +
+      'Der Zustellserver (Modus B, freiwillig) speichert nur Postfach-Kennung, ' +
       'Ciphertext, Zeitstempel und Verfallszeit. Trotzdem sieht er, dass ein Postfach zu einem ' +
       'Zeitpunkt etwas bekommt und wie groß es ist. Modus B ist Bequemlichkeit, kein ' +
       'Sicherheitsgewinn. Modus A braucht überhaupt keinen Server.',
+  },
+  {
+    titel: 'Der Server prüft nicht, ob das Eingeworfene verschlüsselt ist',
+    text:
+      'Er nimmt Bytes entgegen und legt sie ab; ob es ein PGP-Block ist oder blanker Text, kann ' +
+      'er nicht beurteilen — dafür müsste er hineinsehen. Verschlüsselt wird ausschließlich im ' +
+      'Browser, bevor etwas dein Gerät verlässt. Und dein Postfach steht jedem offen, der deinen ' +
+      'öffentlichen Schlüssel hat: so kann dir jemand schreiben, ohne dass es ein Verzeichnis ' +
+      'gibt — unerwünschte Post eingeschlossen. Lesen kann es nur, wer den privaten Schlüssel hat.',
   },
   {
     titel: 'Der Browser ist die Angriffsfläche',

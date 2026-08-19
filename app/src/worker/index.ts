@@ -148,6 +148,30 @@ async function fuehreAus(anfrage: AnyRequest): Promise<unknown> {
     case 'keys.exportBinaer':
       return { daten: await vault.binaerOeffentlich(anfrage.fingerprint) };
 
+    // ---------------------------------------------------- Relay + Verlauf
+
+    case 'relay.signiere':
+      return await vault.signiereFuerRelay(anfrage.fingerprint, anfrage.text);
+
+    case 'verlauf.liste':
+      return await vault.verlauf.liste(
+        anfrage.kontaktFp, vault.entsperrteSchluessel(), await vault.pruefSchluessel([]));
+
+    case 'verlauf.lege': {
+      await vault.verlauf.lege(anfrage.eintrag);
+      return await vault.verlauf.liste(
+        anfrage.eintrag.kontaktFp, vault.entsperrteSchluessel(), await vault.pruefSchluessel([]));
+    }
+
+    case 'verlauf.loesche': {
+      await vault.verlauf.loesche(anfrage.kontaktFp);
+      return await vault.verlauf.liste(
+        anfrage.kontaktFp, vault.entsperrteSchluessel(), await vault.pruefSchluessel([]));
+    }
+
+    case 'verlauf.zaehler':
+      return await vault.verlauf.zaehler();
+
     default: {
       const unerreichbar: never = anfrage;
       throw new Error(`unbekannte Operation: ${JSON.stringify(unerreichbar)}`);

@@ -3,5 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Zero-Knowledge-Briefkasten. Wird in Phase 4 gebaut."
+  "description": "Zero-Knowledge-Briefkasten. Sieht ausschliesslich Ciphertext.",
+  "scripts": {
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "fastify": "5.12.1",
+    "openpgp": "6.3.1",
+    "node-sqlite3-wasm": "0.8.60"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
 }

@@ -26,7 +26,9 @@ import type {
 import { STANDARD_EINSTELLUNGEN } from '../crypto/protocol.ts';
 import { AutoLock } from './autolock.ts';
 import { Kontaktbuch } from './kontakte.ts';
+import { Verlauf } from './verlauf.ts';
 import * as idb from './idb.ts';
+import { signiere as signiereText } from './werkzeug.ts';
 import {
   beschreibeSchluessel,
   erzeugeSchluessel,
@@ -71,6 +73,13 @@ export class Vault {
   }
 
   #kontaktbuch: Kontaktbuch | null = null;
+  #verlauf: Verlauf | null = null;
+
+  /** Der Gesprächsverlauf teilt sich die Datenbank mit dem Schlüsselbund. */
+  get verlauf(): Verlauf {
+    this.#verlauf ??= new Verlauf(this.#datenbank);
+    return this.#verlauf;
+  }
 
   /** Das Kontaktbuch teilt sich die Datenbank mit dem Schlüsselbund. */
   get kontakte(): Kontaktbuch {
@@ -332,6 +341,19 @@ export class Vault {
     if (zeile === undefined) throw new KlartextError('KEY_NOT_FOUND');
     const key = await leseOeffentlich(zeile.armoredPublic);
     return key.write();
+  }
+
+  /**
+   * Signiert die Postfach-Herausforderung und gibt den öffentlichen Schlüssel
+   * dazu — der Server braucht beides, um die Bindung selbst nachzurechnen.
+   */
+  async signiereFuerRelay(fingerprint: string, text: string): Promise<{ signatur: string; schluessel: string }> {
+    const privat = this.#privaterSchluessel(fingerprint);
+    return {
+      // abgetrennt: der Server prüft die Signatur gegen den Text, den er selbst bildet.
+      signatur: await signiereText(text, privat, true),
+      schluessel: privat.toPublic().armor(),
+    };
   }
 
   async widerrufszertifikat(fingerprint: string): Promise<string> {
