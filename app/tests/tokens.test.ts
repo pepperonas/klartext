@@ -143,3 +143,17 @@ describe('Federn', () => {
     }
   });
 });
+
+describe('Klassennamen ohne Nebenwirkung', () => {
+  // Wie oben: kommentarfrei prüfen, sonst schlägt der eigene Erklärtext an.
+  const CSS_PUR = CSS_QUELLE.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('die Layoutregel fuer <main> trifft keine Knoepfe', () => {
+    // ⚠️ `.haupt { flex: 1 }` war fuer das <main> gedacht, traf aber jeden
+    //    Hauptknopf (`.knopf.haupt`) in einer Flex-Reihe — der wuchs dann auf
+    //    den freien Platz und las sich als Banner. Die Regel muss am Element
+    //    haengen, damit der geteilte Klassenname folgenlos bleibt.
+    expect(CSS_PUR).toMatch(/main\.haupt\s*\{[^}]*flex:\s*1/);
+    expect(CSS_PUR).not.toMatch(/(^|[^.\w])\.haupt\s*\{[^}]*flex/m);
+  });
+});

@@ -51,6 +51,7 @@ interface GespeicherterSchluessel {
   readonly importedAt: string;
   /** Wann der private Schlüssel zuletzt als Datei ausgegeben wurde. */
   readonly backupAt?: string | null;
+  readonly widerrufAt?: string | null;
 }
 
 interface EinstellungsZeile {
@@ -212,6 +213,7 @@ export class Vault {
         isDefault: zeile.isDefault,
         label: zeile.label,
         backupAt: zeile.backupAt ?? null,
+        widerrufAt: zeile.widerrufAt ?? null,
       }));
     }
     return infos.sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.created.localeCompare(b.created));
@@ -357,7 +359,16 @@ export class Vault {
   }
 
   async widerrufszertifikat(fingerprint: string): Promise<string> {
-    return await erzeugeWiderrufszertifikat(this.#privaterSchluessel(fingerprint));
+    const normal = normalisiereFingerprint(fingerprint);
+    const armored = await erzeugeWiderrufszertifikat(this.#privaterSchluessel(normal));
+    // Erst nach dem erfolgreichen Erzeugen vermerken — wie beim Backup: ein
+    // Haken an einer gescheiterten Handlung wäre schlimmer als kein Haken.
+    const zeile = (await this.#alleGespeicherten()).find((z) => z.fingerprint === normal);
+    if (zeile !== undefined) {
+      await this.#speichere({ ...zeile, widerrufAt: new Date().toISOString() });
+      this.#beiAenderung();
+    }
+    return armored;
   }
 
   async wendeWiderrufAn(armored: string): Promise<KeyInfo> {

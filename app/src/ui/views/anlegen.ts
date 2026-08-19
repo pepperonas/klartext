@@ -29,13 +29,22 @@ import { PasswortFeld } from '../components/passwortfeld.ts';
 import { Schrittleiste } from '../components/schritte.ts';
 import { el, ersetze } from '../dom.ts';
 
+/**
+ * ⚠️ Hier standen einmal SECHS Schritte: nach „Sichern" kamen noch
+ *    Widerrufszertifikat und Schlüssel-Backup. Beides ist wichtig — aber es
+ *    sind Fragen für jemanden, der die App BEHALTEN will, und sie standen vor
+ *    dem ersten Nutzen. Der Einstieg kostete dadurch dreizehn Handgriffe.
+ *
+ *    Beide sind jetzt Aufgaben auf der Schlüsselseite (die Knöpfe dafür gab es
+ *    dort ohnehin schon), und sie bleiben dort stehen, bis sie erledigt sind.
+ *    Das senkt die Hürde und erhöht zugleich die Zahl derer, die es nie
+ *    erledigen — bewusst in Kauf genommen, siehe PLAN-UX2.md §5.
+ */
 const SCHRITTE = [
   { titel: 'Wer bist du' },
   { titel: 'Verfahren' },
   { titel: 'Passphrase' },
   { titel: 'Sichern' },
-  { titel: 'Widerruf' },
-  { titel: 'Backup' },
 ] as const;
 
 export const LETZTER_SCHRITT = SCHRITTE.length;
@@ -140,9 +149,7 @@ export class AnlegenAblauf {
       case 1: return this.#schrittIdentitaet();
       case 2: return this.#schrittVerfahren();
       case 3: return this.#schrittPassphrase();
-      case 4: return this.#schrittSichern();
-      case 5: return this.#schrittWiderruf();
-      default: return this.#schrittBackup();
+      default: return this.#schrittSichern();
     }
   }
 
@@ -240,9 +247,17 @@ export class AnlegenAblauf {
       }),
       el('div', { class: 'wahlreihe' },
         wahl('rsa4096', 'RSA-4096',
-          'Versteht jedes GnuPG, auch alte Fassungen. Das Erzeugen dauert bis zu einer Minute.'),
+          'Versteht jedes GnuPG, auch alte Fassungen. Das Erzeugen dauert bis zu einer Minute, ' +
+          'und dein Einladungslink wird zu lang für einen QR-Code.'),
         wahl('curve25519', 'Curve25519',
-          'In einem Augenblick erzeugt und mindestens genauso sicher. Braucht GnuPG 2.1 oder neuer — praktisch überall vorhanden.')),
+          'In einem Augenblick erzeugt und mindestens genauso sicher. Der Einladungslink passt ' +
+          'in einen QR-Code. Braucht GnuPG 2.1 oder neuer — praktisch überall vorhanden.')),
+      // ⚠️ Diese Folge stand bisher NUR auf dem Einladungsschirm — also erst,
+      //    wenn die Wahl längst getroffen war. Wer die Vorgabe nimmt, soll
+      //    hier erfahren, was sie kostet, nicht Tage später.
+      el('p', { class: 'hinweis leise', text:
+        'Ein RSA-Einladungslink wiegt rund 3100 Zeichen; in einen QR-Code passen höchstens 2953. ' +
+        'Mit Curve25519 sind es etwa 780 — dann könnt ihr euch den Code abscannen, wenn ihr euch seht.' }),
       this.#fuss('Zurück', weiter),
     );
   }
@@ -525,10 +540,14 @@ export class AnlegenAblauf {
         userId: { name: this.#entwurf.name, email: this.#entwurf.email },
         passphrase: this.passphrase,
       });
-      this.#entwurf.zertifikat = ergebnis.revocationCertificate;
       this.#entwurf.fingerprint = ergebnis.info.fingerprint;
       await this.#client.aktualisiereStatus();
-      this.#weiter();
+      // ⚠️ Das frisch erzeugte Widerrufszertifikat wird hier bewusst NICHT
+      //    aufgehoben. Es liesse sich nur im Speicher halten, überlebte also
+      //    kein Neuladen — und `keys.revocationCertificate` erzeugt jederzeit
+      //    ein neues, gleichwertiges aus dem entsperrten Schlüssel. Ein
+      //    aufgehobenes Zertifikat wäre eine zweite Wahrheit ohne Gewinn.
+      this.#beiFertig();
     } catch (fehler) {
       meldung.dataset['art'] = 'gefahr';
       meldung.textContent = fehler instanceof KlartextError ? fehler.message : 'Unerwarteter Fehler.';
@@ -539,121 +558,7 @@ export class AnlegenAblauf {
     }
   }
 
-  // --------------------------------------------------------------- 5 Widerruf
 
-  #schrittWiderruf(): HTMLElement {
-    const zertifikat = this.#entwurf.zertifikat ?? '';
-    const weiter = el('button', { class: 'knopf haupt', type: 'button', text: 'Weiter' });
-    weiter.disabled = !this.#entwurf.zertifikatGeholt;
-    // ⚠️ Ohne diesen Handler ist der Knopf eine Attrappe — er sieht aus wie ein
-    //    Weg nach vorn und tut nichts. Gefunden von tools/e2e/wegfindung.mjs,
-    //    beim allerersten Lauf.
-    weiter.addEventListener('click', () => { this.#weiter(); });
 
-    const holen = el('button', { class: 'knopf haupt', type: 'button', text: 'Widerrufszertifikat herunterladen' });
-    holen.addEventListener('click', () => {
-      lade('klartext-widerruf.asc', zertifikat);
-      this.#entwurf.zertifikatGeholt = true;
-      weiter.disabled = false;
-      holen.textContent = 'Noch einmal herunterladen';
-      holen.classList.remove('haupt');
-    });
-
-    return el(
-      'div',
-      { class: 'schritt-inhalt' },
-      el('h3', { text: 'Der Schlüssel ist da — jetzt der Notausschalter' }),
-      el('p', {
-        class: 'hinweis',
-        text:
-          'Mit diesem Zertifikat erklärst du den Schlüssel für ungültig, falls du ihn ' +
-          'verlierst oder er in falsche Hände gerät. Es hilft nur, wenn du es jetzt ' +
-          'woanders ablegst — ohne es bleibt ein verlorener Schlüssel für immer gültig.',
-      }),
-      el('textarea', { class: 'block', readonly: true, rows: '8', 'aria-label': 'Widerrufszertifikat' }, zertifikat),
-      el('div', { class: 'knopfreihe' }, holen),
-      el('p', {
-        class: 'hinweis leise',
-        text: 'Weiter geht es, sobald du es heruntergeladen hast.',
-      }),
-      this.#fuss('Zurück', weiter),
-    );
-  }
-
-  // ----------------------------------------------------------------- 6 Backup
-
-  #schrittBackup(): HTMLElement {
-    const meldung = el('p', { class: 'meldung', role: 'status', 'aria-live': 'polite' });
-    const pw = new PasswortFeld({ id: 'backup-pw', beschriftung: 'Passwort für die Sicherungsdatei' });
-
-    const fertig = el('button', { class: 'knopf haupt', type: 'button', text: 'Sicherung erzeugen' });
-    fertig.addEventListener('click', () => { void this.#sichere(pw.wert, meldung); });
-
-    const ueberspringen = el('button', { class: 'knopf', type: 'button', text: 'Ohne Sicherung fortfahren' });
-    ueberspringen.addEventListener('click', () => {
-      meldung.dataset['art'] = 'warnung';
-      meldung.textContent =
-        'Ohne Sicherung ist dein Schlüssel weg, sobald die Browserdaten gelöscht werden — ' +
-        'auch mit der Passphrase. Du kannst sie jederzeit auf der Schlüsselseite nachholen.';
-      const wirklich = el('button', { class: 'knopf gefahr', type: 'button', text: 'Verstanden, trotzdem weiter' });
-      wirklich.addEventListener('click', () => { this.#beiFertig(); });
-      ueberspringen.replaceWith(wirklich);
-    });
-
-    return el(
-      'div',
-      { class: 'schritt-inhalt' },
-      el('h3', { text: 'Sicherung anlegen' }),
-      el('p', {
-        class: 'hinweis',
-        text:
-          'Das hier ist das eigentliche Backup: eine Datei mit deinem privaten Schlüssel. ' +
-          'Mit ihr kommst du auf einem neuen Rechner oder nach einem gelöschten Browser ' +
-          'wieder an deine Nachrichten. Die Passphrase allein reicht dafür nicht.',
-      }),
-      el('div', { class: 'warnkasten' },
-        el('p', {
-          class: 'hinweis',
-          text:
-            'Wähle ein anderes Passwort als deine Passphrase und leg die Datei getrennt ' +
-            'davon ab — auf einem Stick, in einem Passwortmanager, nicht daneben.',
-        })),
-      pw.wurzel,
-      meldung,
-      el('div', { class: 'knopfreihe' }, ueberspringen, fertig),
-    );
-  }
-
-  async #sichere(passwort: string, meldung: HTMLElement): Promise<void> {
-    const fingerprint = this.#entwurf.fingerprint;
-    if (fingerprint === null) return;
-    if (passwort.length < 8) {
-      meldung.dataset['art'] = 'gefahr';
-      meldung.textContent = 'Das Passwort ist zu kurz — mindestens 8 Zeichen.';
-      return;
-    }
-    try {
-      const ergebnis = await this.#client.ruf('keys.export', {
-        fingerprint, secret: true, exportPassphrase: passwort,
-      });
-      lade(ergebnis.filename, ergebnis.armored);
-      this.#entwurf.backupGemacht = true;
-      meldung.dataset['art'] = 'gut';
-      meldung.textContent = 'Sicherung erzeugt. Behandle die Datei wie den Schlüssel selbst.';
-      setTimeout(() => { this.#beiFertig(); }, 1200);
-    } catch (fehler) {
-      meldung.dataset['art'] = 'gefahr';
-      meldung.textContent = fehler instanceof KlartextError ? fehler.message : 'Unerwarteter Fehler.';
-    }
-  }
 }
 
-function lade(dateiname: string, inhalt: string): void {
-  const blob = new Blob([inhalt], { type: 'application/pgp-keys' });
-  const url = URL.createObjectURL(blob);
-  const a = el('a', { href: url, download: dateiname });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
-}

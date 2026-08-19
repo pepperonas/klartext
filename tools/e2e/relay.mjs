@@ -153,13 +153,10 @@ async function legeSchluesselAn(seite, name, passphrase) {
   await seite.waitForSelector('#probe');
   await seite.fill('#probe', passphrase);
   await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
-  await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-  await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
-  await seite.click('.schritt-fuss button:has-text("Weiter")');
-  await seite.waitForSelector('#backup-pw');
-  await seite.click('button:has-text("Ohne Sicherung fortfahren")');
-  await seite.click('button:has-text("Verstanden")');
-  await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+  // ⚠️ Der Assistent endet seit dem Benutzbarkeits-Durchgang beim erzeugten
+  //    Schlüssel. Widerrufszertifikat und Sicherung sind Aufgaben auf der
+  //    Schlüsselseite geworden — hier ist danach nichts mehr zu klicken.
+  await seite.waitForSelector('.fingerprint', { timeout: 90_000 });
 }
 
 /** Schaltet Modus B ein und trägt die Relay-Adresse ein. */

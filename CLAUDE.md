@@ -597,6 +597,44 @@ beiden Fällen exakt 1140 px. Ich hätte eine Übereinstimmung gemessen, die nic
 über die geladene Schrift sagt. `document.fonts.check()` beantwortet die Frage
 direkt; die Gewichtsachse zeigt sich dagegen sehr wohl in der Breite (991 → 1084).
 
+## Der erste Nutzen kommt vor der Verpflichtung
+
+**Um jemandem etwas zu verschlüsseln, braucht man keinen eigenen Schlüssel** —
+nur den öffentlichen des Gegenübers. Dasselbe gilt fürs Prüfen einer Signatur.
+Der Krypto-Kern konnte das immer (`signiereMit: null` plus eingefügter fremder
+Schlüssel); allein die Oberfläche verbot es, mit einem Satz, der zur Hälfte
+unwahr war („Ohne Schlüssel gibt es nichts zu ver- oder entschlüsseln").
+
+Jetzt steht das Werkzeug offen, und gesperrt ist nur, was wirklich einen eigenen
+Schlüssel braucht — mit dem Grund daneben. `tools/e2e/erster-nutzen.mjs` hält
+das fest: ohne je einen Schlüssel anzulegen einen fremden einfügen, tippen,
+verschlüsseln — und der Block wird von **echtem gpg** im Wortlaut gelesen. Dazu
+die Gegenprobe, dass Entschlüsseln und Signieren gesperrt bleiben.
+
+⚠️ Beim Schreiben dieses Laufs zweimal danebengegriffen: das Ergebnis steht in
+einem `<pre>`, nicht in einem `textarea`, **und** `textContent` liefert die
+Zeilenumbrüche nicht (die Zerfalls-Animation setzt sie als `<br>`, so
+dokumentiert). gpg sagte dazu „no valid OpenPGP data found". Richtig ist ohnehin
+der Weg des Nutzers: den Kopierknopf drücken und die Zwischenablage lesen.
+
+**Der Assistent endet beim erzeugten Schlüssel.** Widerrufszertifikat und
+Sicherung sind Aufgaben auf der Schlüsselseite geworden (die Knöpfe dafür gab es
+dort schon). Der Einstieg kostete vorher dreizehn Handgriffe. ⚠️ Das erhöht die
+Zahl derer, die beides nie erledigen — bewusst in Kauf genommen; die Aufgaben
+bleiben stehen, bis sie erledigt sind, und die rote Warnung bleibt rot.
+
+## `.haupt` traf Knöpfe, die es nie treffen sollte
+
+`.haupt { flex: 1 }` war für das `<main>` gedacht — traf aber jeden
+**Hauptknopf** (`.knopf.haupt`), denn beide teilen sich den Klassennamen. Jeder
+solche Knopf in einer Flex-Reihe wuchs damit auf den freien Platz: „Jemanden
+einladen" spannte über die halbe Kontaktseite und las sich als Banner, auf der
+Startseite war „Schlüssel anlegen" doppelt so breit wie sein Nachbar.
+
+Gefunden durch **Messen im Browser**, nicht durch Lesen — im Stylesheet sieht die
+Regel harmlos aus. Sie hängt jetzt am Element (`main.haupt`), und ein Pin in
+`tokens.test.ts` hält fest, dass sie dort bleibt.
+
 ## Was noch nicht da ist
 
 * Echtes Streaming grosser Dateien durch den Worker (siehe oben — heute fällt

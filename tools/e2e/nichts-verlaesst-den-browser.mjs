@@ -14,6 +14,7 @@
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,7 +82,7 @@ function pruefe(quelle, text) {
 const { server, port } = await starteServer();
 const basis = `http://127.0.0.1:${port}`;
 const browser = await chromium.launch({ headless: true });
-const kontext = await browser.newContext();
+const kontext = await browser.newContext({ acceptDownloads: true });
 
 // 1) Jede Anfrage, die der Browser selbst absetzt.
 kontext.on('request', (req) => {
@@ -167,15 +168,25 @@ for (let i = 0; i < proben.length; i++) await proben[i].fill(woerterJetzt[positi
 const freiBeiRichtig = await seite.isEnabled('button:has-text("Schlüssel jetzt erzeugen")');
 
 await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
-await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-const zertifikat = await seite.inputValue('textarea[aria-label="Widerrufszertifikat"]');
-await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
-await seite.click('.schritt-fuss button:has-text("Weiter")');
+// Der Assistent endet hier; Widerruf und Sicherung sind Aufgaben auf der
+// Schlüsselseite. Beide werden gleich über genau diesen Weg erledigt.
+await seite.waitForSelector('.fingerprint', { timeout: 90_000 });
 
-await seite.waitForSelector('#backup-pw');
-await seite.fill('#backup-pw', MARKER.exportPassphrase);
+// ⚠️ Das Widerrufszertifikat steht nicht mehr in einem Feld, es wird direkt
+//    heruntergeladen. Also wird der Download abgefangen — das ist ohnehin der
+//    Weg, den der Nutzer geht.
+const [herunterladen] = await Promise.all([
+  seite.waitForEvent('download', { timeout: 30_000 }),
+  seite.click('.aufgabenkarte button:has-text("Jetzt erzeugen")'),
+]);
+const zertifikat = readFileSync(await herunterladen.path(), 'utf8');
+
+await seite.click('.aufgabenkarte button:has-text("Sicherung erzeugen")');
+await seite.waitForSelector('#export-pw', { timeout: 20_000 });
+await seite.fill('#export-pw', MARKER.exportPassphrase);
 await seite.click('button:has-text("Sicherung erzeugen")');
-
+await seite.waitForTimeout(1500);
+await seite.click('.nav-eintrag:has-text("Schlüssel")');
 await seite.waitForSelector('.fingerprint', { timeout: 30_000 });
 const fingerprint = (await seite.textContent('.fingerprint'))?.trim() ?? '';
 const kerbeOffen = (await seite.textContent('.kerbe'))?.trim() ?? '';

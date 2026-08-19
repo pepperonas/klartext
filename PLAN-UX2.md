@@ -1,6 +1,6 @@
 # PLAN-UX2.md — `klartext` einfacher machen
 
-> Status: **Entschieden, noch nicht umgesetzt.** Stand: 2026-08-19
+> Status: **Umgesetzt.** Stand: 2026-08-19
 > Vorgänger: [`PLAN-UX.md`](PLAN-UX.md) (Sackgassen, geführte Schlüsselerzeugung,
 > Orientierung — umgesetzt). Dieser Plan setzt darauf auf.
 

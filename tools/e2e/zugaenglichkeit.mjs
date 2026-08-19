@@ -97,13 +97,9 @@ async function bisSchluessel(seite) {
   const proben = await seite.locator('.wortprobe').all();
   for (let i = 0; i < proben.length; i++) await proben[i].fill(woerter[positionen[i] - 1] ?? '');
   await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
-  await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-  await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
-  await seite.click('.schritt-fuss button:has-text("Weiter")');
-  await seite.waitForSelector('#backup-pw');
-  await seite.click('button:has-text("Ohne Sicherung fortfahren")');
-  await seite.click('button:has-text("Verstanden")');
-  await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+  // Der Assistent endet beim erzeugten Schlüssel; Widerruf und Sicherung sind
+  // Aufgaben auf der Schlüsselseite geworden.
+  await seite.waitForSelector('.fingerprint', { timeout: 90_000 });
 }
 
 const alle = [
@@ -144,10 +140,19 @@ const alle = [
   ...(await pruefe('Schlüssel vorhanden, ohne Sicherung', bisSchluessel)),
   ...(await pruefe('Sicherung erzeugen', async (seite) => {
     await bisSchluessel(seite);
-    await seite.click('button:has-text("Sicherung erzeugen")');
+    // ⚠️ „Sicherung erzeugen" steht jetzt zweimal auf der Seite: als Aufgabe
+    //    und auf der Schlüsselkarte. Beide führen zum selben Ziel, der
+    //    Selektor muss trotzdem eindeutig sein.
+    await seite.click('.aufgabenkarte button:has-text("Sicherung erzeugen")');
     await seite.waitForSelector('#export-pw');
     await seite.click('button:has-text("Passwort vorschlagen")');
     await seite.waitForSelector('.passwort-vorschlag');
+  })),
+  // Der neue Zustand: das Werkzeug OHNE eigenen Schlüssel.
+  ...(await pruefe('Werkzeug ohne eigenen Schlüssel', async (seite) => {
+    await seite.waitForSelector('.nav');
+    await seite.click('.nav-eintrag:has-text("Werkzeug")');
+    await seite.waitForSelector('.hinweiskasten');
   })),
   ...(await pruefe('Werkzeug mit Ergebnis', async (seite) => {
     await bisSchluessel(seite);
@@ -178,7 +183,7 @@ const alle = [
     // Einen Kontakt anlegen, um die Abgleich-Ansicht zu erreichen.
     await seite.fill('#kontakt-key', KONTAKT_SCHLUESSEL);
     await seite.fill('#kontakt-name', 'Rosa');
-    await seite.click('button:has-text("Prüfen")');
+    await seite.click('button:has-text("Kontakt aufnehmen")');
     await seite.waitForSelector('.kontakt', { timeout: 20_000 });
     await seite.click('button:has-text("Fingerprint abgleichen")');
     await seite.waitForSelector('.woerter');

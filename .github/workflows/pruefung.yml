@@ -57,6 +57,10 @@ jobs:
       - name: Wegfindung
         run: npm run wege
 
+      # Verschlüsseln ohne eigenen Schlüssel — gegengeprüft mit echtem gpg.
+      - name: Erster Nutzen
+        run: npm run erster-nutzen
+
       # Phase 2 gilt als erfüllt, wenn die App im Flugmodus arbeitet.
       - name: Offline-Betrieb
         run: npm run offline

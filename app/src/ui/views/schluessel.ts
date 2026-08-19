@@ -70,29 +70,42 @@ export class SchluesselAnsicht {
 
   #zeichneLeer(): void {
     const anlegen = knopfMit('Schlüssel anlegen', () => { this.#optionen.beiAnlegen(); }, 'haupt gross');
-    const info = knopfMit('Was klartext nicht kann', () => { this.#optionen.beiInfo(); });
+    // Kein zweiter Knopf neben dem Hauptknopf mehr — ein Textlink im Satz, der
+    // ohnehin dorthin schickt. Ein <button> und kein <a>, weil der Router den
+    // Weg kennt und keine Adresse nötig ist.
+    const info = el('button', { class: 'textlink', type: 'button', text: 'Was klartext nicht kann' });
+    info.addEventListener('click', () => { this.#optionen.beiInfo(); });
 
     ersetze(
       this.wurzel,
       karte(
-        el('h2', { class: 'gross', text: 'PGP, das in deinem Browser bleibt' }),
+        el('h2', { class: 'gross', text: 'Schick jemandem etwas, das unterwegs niemand lesen kann' }),
+        // ⚠️ Ein Satz über das ANLIEGEN, bevor der Satz über die Technik kommt.
+        //    Vorher stand hier zuerst „PGP, OpenPGP, Ciphertext, gpg" — wer die
+        //    Begriffe kennt, war sofort zu Hause; alle anderen fanden keinen
+        //    Satz über ihr eigenes Vorhaben.
+        el('p', { class: 'vorspann', text:
+          'Auch nicht der Dienst, über den du es schickst. Du behältst den Schlüssel dazu — ' +
+          'hier auf diesem Gerät, ohne Konto und ohne Anmeldung.' }),
         el('p', {
           text:
-            'klartext verschlüsselt, entschlüsselt, signiert und prüft OpenPGP — vollständig ' +
-            'hier auf diesem Gerät. Dein privater Schlüssel verlässt den Browser nicht, es gibt ' +
-            'kein Konto und keine Anmeldung.',
+            'klartext verschlüsselt, entschlüsselt, signiert und prüft OpenPGP, vollständig im ' +
+            'Browser. Dein privater Schlüssel verlässt ihn nicht.',
         }),
         el('ul', { class: 'liste' },
           el('li', { text: 'Was gpg erzeugt, liest klartext. Was klartext erzeugt, liest gpg.' }),
           el('li', { text: 'Der Ciphertext geht über den Kanal, den du wählst — Signal, Mail, Matrix.' }),
           el('li', { text: 'Ohne Netz funktioniert es genauso, denn es gibt nichts zu fragen.' })),
-        el('p', {
-          class: 'hinweis warnend',
-          text:
-            'Was diese App NICHT kann, steht ausgeschrieben da — ein Tipp genügt. Bitte lies es, ' +
-            'bevor du dich auf sie verlässt.',
-        }),
-        el('div', { class: 'knopfreihe' }, anlegen, info),
+        // ⚠️ Eigener Absatz, kein Listenpunkt: auf der Einrückung der Liste,
+        //    aber ohne Punkt davor, las sich der Satz wie ein vierter, kaputter
+        //    Eintrag — in jeder Fenstergrösse.
+        el('p', { class: 'hinweis warnend abgesetzt' },
+          info,
+          document.createTextNode(' steht ausgeschrieben da. Bitte lies es, bevor du dich auf sie verlässt.')),
+        // „Was klartext nicht kann" stand zweimal gleichzeitig auf dem Schirm —
+        // als zweiter Knopf neben dem Hauptknopf und in der Fusszeile. Einmal
+        // genügt; der Weg dorthin bleibt über den Satz darüber und den Fuss.
+        el('div', { class: 'knopfreihe' }, anlegen),
       ),
       this.#meldungsfeld(),
     );
@@ -163,10 +176,64 @@ export class SchluesselAnsicht {
             'erzeugen" eine Datei an und bewahre sie getrennt von der Passphrase auf.',
         })),
 
+      this.#aufgaben(schluessel),
       ...schluessel.map((k) => this.#schluesselkarte(k, false)),
       this.#importKarte(),
       this.#meldungsfeld(),
     );
+  }
+
+  /**
+   * „Was jetzt?" — die Frage, die nach dem Anlegen unbeantwortet blieb.
+   *
+   * Hier landen die zwei Schritte, die aus dem Assistenten herausgenommen
+   * wurden (Widerrufszertifikat, Sicherung), plus der nächste sinnvolle
+   * Handgriff. Bewusst KEIN Assistent und kein Zwang: eine Liste, die
+   * verschwindet, sobald nichts mehr offen ist.
+   *
+   * ⚠️ Die rote Warnung über der fehlenden Sicherung bleibt bestehen. Diese
+   *    Liste ist der WEG zur Erledigung, nicht ihr Ersatz — eine Aufgabe
+   *    freundlich zu formulieren macht sie nicht weniger dringend.
+   */
+  #aufgaben(schluessel: readonly KeyInfo[]): HTMLElement | null {
+    const eigener = schluessel.find((k) => k.isDefault) ?? schluessel[0];
+    if (eigener === undefined) return null;
+
+    const offen: HTMLElement[] = [];
+
+    if (eigener.widerrufAt === null) {
+      offen.push(this.#aufgabe(
+        'Widerrufszertifikat anlegen',
+        'Damit erklärst du den Schlüssel für ungültig, falls er dir abhandenkommt. ' +
+        'Ohne dieses Zertifikat geht das nie mehr — es lässt sich nur mit dem ' +
+        'Schlüssel erzeugen, den du dann nicht mehr hast.',
+        'Jetzt erzeugen',
+        () => { void this.#widerruf(eigener); }));
+    }
+
+    if (!eigener.hasBackup) {
+      offen.push(this.#aufgabe(
+        'Schlüssel sichern',
+        'Eine Datei mit deinem privaten Schlüssel, getrennt von der Passphrase aufbewahrt. ' +
+        'Ohne sie ist der Schlüssel weg, sobald die Browserdaten gelöscht werden.',
+        'Sicherung erzeugen',
+        () => { this.#optionen.beiExport(eigener.fingerprint); }));
+    }
+
+    if (offen.length === 0) return null;
+
+    return el('section', { class: 'karte aufgabenkarte' },
+      el('h3', { text: 'Als Nächstes' }),
+      el('p', { class: 'hinweis', text: 'Zwei Dinge, die man einmal erledigt und danach nie wieder braucht — bis man sie braucht.' }),
+      ...offen);
+  }
+
+  #aufgabe(titel: string, warum: string, knopfText: string, beiKlick: () => void): HTMLElement {
+    return el('div', { class: 'aufgabe' },
+      el('div', { class: 'aufgabe-text' },
+        el('strong', { text: titel }),
+        el('p', { class: 'hinweis', text: warum })),
+      knopfMit(knopfText, beiKlick, 'haupt'));
   }
 
   #schluesselkarte(schluessel: KeyInfo, gesperrt: boolean): HTMLElement {

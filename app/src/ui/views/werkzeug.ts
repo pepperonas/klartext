@@ -28,12 +28,14 @@ const ERKENN_VERZUG_MS = 220;
 export interface WerkzeugOptionen {
   readonly client: CryptoClient;
   readonly beiEntsperren: () => void;
+  readonly beiAnlegen: () => void;
 }
 
 export class WerkzeugAnsicht {
   readonly wurzel = el('div', { class: 'ansicht' });
   readonly #client: CryptoClient;
   readonly #beiEntsperren: () => void;
+  readonly #beiAnlegen: () => void;
 
   #eingabe = el('textarea', {
     id: 'wz-eingabe', class: 'block gross-feld', rows: '9',
@@ -55,6 +57,7 @@ export class WerkzeugAnsicht {
   #schluessel: readonly KeyInfo[] = [];
   #gewaehlt = new Set<string>();
   #signieren = true;
+  #abgetrennt = false;
   #erkennung: Erkennung | null = null;
   #erkennTimer: ReturnType<typeof setTimeout> | null = null;
   #status: VaultStatus['state'] = 'empty';
@@ -62,20 +65,24 @@ export class WerkzeugAnsicht {
   constructor(optionen: WerkzeugOptionen) {
     this.#client = optionen.client;
     this.#beiEntsperren = optionen.beiEntsperren;
+    this.#beiAnlegen = optionen.beiAnlegen;
     this.#eingabe.addEventListener('input', () => { this.#erkennenGleich(); });
   }
 
   async zeichne(status: VaultStatus): Promise<void> {
     this.#status = status.state;
 
-    if (status.state === 'empty') {
-      ersetze(this.wurzel, el('section', { class: 'karte' },
-        el('h2', { text: 'Erst brauchst du einen Schlüssel' }),
-        el('p', { text: 'Ohne Schlüssel gibt es nichts zu ver- oder entschlüsseln. Leg zuerst einen an.' })));
-      return;
-    }
-
-    this.#schluessel = await this.#client.ruf('keys.list', {});
+    // ⚠️ Hier stand ein Frühausstieg: ohne eigenen Schlüssel zeigte das
+    //    Werkzeug nur „Erst brauchst du einen Schlüssel". Der Satz dazu war zur
+    //    Hälfte unwahr — an jemanden zu verschlüsseln und eine Signatur zu
+    //    prüfen braucht NUR den fremden öffentlichen Schlüssel, nie einen
+    //    eigenen. Der Krypto-Kern konnte das die ganze Zeit (`signiereMit:
+    //    null`), allein die Oberfläche verbot es. Damit lag der erste Nutzen
+    //    hinter dreizehn Schritten Assistent.
+    //
+    //    Jetzt wird derselbe Schirm gezeichnet; gesperrt ist nur, was wirklich
+    //    einen eigenen Schlüssel braucht — mit dem Grund daneben.
+    this.#schluessel = status.state === 'empty' ? [] : await this.#client.ruf('keys.list', {});
     if (this.#gewaehlt.size === 0) {
       const standard = this.#schluessel.find((k) => k.isDefault) ?? this.#schluessel[0];
       if (standard !== undefined) this.#gewaehlt.add(standard.fingerprint);
@@ -85,6 +92,7 @@ export class WerkzeugAnsicht {
       this.wurzel,
       el('h2', { class: 'ansicht-titel', text: 'Werkzeug' }),
       status.state === 'locked' ? this.#gesperrtHinweis() : null,
+      status.state === 'empty' ? this.#ohneSchluesselHinweis() : null,
       el('section', { class: 'karte' },
         el('div', { class: 'feld' },
           el('label', { for: 'wz-eingabe', text: 'Text oder eingefügter Block' }),
@@ -112,6 +120,41 @@ export class WerkzeugAnsicht {
           'Schlüssel. Zum Entschlüsseln und Signieren musst du entsperren.',
       }),
       el('div', { class: 'knopfreihe' }, knopf));
+  }
+
+  /**
+   * Was ohne eigenen Schlüssel geht — und was nicht.
+   *
+   * Bewusst dieselbe Form wie der Gesperrt-Hinweis: es ist derselbe Gedanke.
+   * Die eine Hälfte des Werkzeugs braucht nur das Gegenüber, die andere den
+   * eigenen Schlüssel.
+   */
+  #ohneSchluesselHinweis(): HTMLElement {
+    const knopf = el('button', { class: 'knopf haupt', type: 'button', text: 'Schlüssel anlegen' });
+    knopf.addEventListener('click', () => { this.#beiAnlegen(); });
+    return el('div', { class: 'hinweiskasten' },
+      el('strong', { text: 'Du kannst hier sofort loslegen.' }),
+      el('p', {
+        class: 'hinweis',
+        text:
+          'An jemanden verschlüsseln und Signaturen prüfen braucht nur den öffentlichen ' +
+          'Schlüssel des Gegenübers — füge ihn unter „An wen?" ein. Zum Entschlüsseln und ' +
+          'Signieren brauchst du einen eigenen.',
+      }),
+      el('div', { class: 'knopfreihe' }, knopf));
+  }
+
+  /**
+   * Der Grund, warum eine Handlung gerade nicht geht — oder null.
+   *
+   * ⚠️ Vorher stand hier überall derselbe Satz („entsperren"). Ohne eigenen
+   *    Schlüssel ist der falsch: da gibt es nichts zu entsperren.
+   */
+  #warumNicht(): string | null {
+    if (this.#status === 'unlocked') return null;
+    return this.#status === 'empty'
+      ? 'Dafür brauchst du einen eigenen Schlüssel.'
+      : 'Dafür muss der Schlüsselbund entsperrt sein.';
   }
 
   // ----------------------------------------------------------- Erkennung
@@ -146,21 +189,22 @@ export class WerkzeugAnsicht {
       }));
     }
 
-    const offen = this.#status === 'unlocked';
+    const warum = this.#warumNicht();
     switch (e.art) {
       case 'klartext':
         this.#aktion('Verschlüsseln', () => { void this.#verschluesseln(); }, 'haupt',
           this.#gewaehlt.size === 0 && this.#fremdKey.value.trim().length === 0
             ? 'Wähle zuerst mindestens einen Empfänger.' : null);
-        this.#aktion('Signieren', () => { void this.#signierenJetzt(false); }, '',
-          offen ? null : 'Dafür muss der Schlüsselbund entsperrt sein.');
-        this.#aktion('Nur Signatur erzeugen', () => { void this.#signierenJetzt(true); }, '',
-          offen ? null : 'Dafür muss der Schlüsselbund entsperrt sein.');
+        // ⚠️ Aus „Signieren" und „Nur Signatur erzeugen" ist EIN Knopf plus
+        //    eine Option geworden. Der Unterschied eingebettet/abgetrennt ist
+        //    eine Fachfrage; als zwei gleich laute Knöpfe verlangte er eine
+        //    Entscheidung von Leuten, die die Begriffe nicht kennen.
+        this.#aktion('Signieren', () => { void this.#signierenJetzt(this.#abgetrennt); }, '', warum);
+        if (warum === null) this.#aktionen.appendChild(this.#abgetrenntWahl());
         break;
       case 'nachricht':
         this.#aktion('Entschlüsseln', () => { void this.#entschluesseln(); }, 'haupt',
-          !offen ? 'Dafür muss der Schlüsselbund entsperrt sein.'
-            : e.fuerUns ? null : 'Diese Nachricht ist an keinen deiner Schlüssel gerichtet.');
+          warum ?? (e.fuerUns ? null : 'Diese Nachricht ist an keinen deiner Schlüssel gerichtet.'));
         break;
       case 'signierter-text':
         this.#aktion('Signatur prüfen', () => { void this.#pruefen(); }, 'haupt', null);
@@ -187,6 +231,15 @@ export class WerkzeugAnsicht {
         }));
         break;
     }
+  }
+
+  /** Die Wahl zwischen eingebetteter und abgetrennter Signatur, im Klartext. */
+  #abgetrenntWahl(): HTMLElement {
+    const haken = el('input', { type: 'checkbox', id: 'wz-abgetrennt' });
+    haken.checked = this.#abgetrennt;
+    haken.addEventListener('change', () => { this.#abgetrennt = haken.checked; });
+    return el('label', { class: 'nebenwahl' }, haken,
+      el('span', { text: 'abgetrennt — die Signatur kommt als eigener Block, der Text bleibt unverändert' }));
   }
 
   #aktion(text: string, beiKlick: () => void, klasse: string, gesperrtWeil: string | null): void {
@@ -224,15 +277,32 @@ export class WerkzeugAnsicht {
 
     this.#fremdKey.addEventListener('input', () => { this.#zeichneErkennung(); });
 
+    const ohneEigenen = this.#schluessel.length === 0;
+
     ersetze(this.#empfaengerKarte,
       el('h3', { text: 'An wen?' }),
-      el('p', { class: 'hinweis', text: 'Nur wer hier steht, kann die Nachricht später lesen. Dich selbst mitzunehmen ist meist sinnvoll — sonst kommst du an deine eigene Nachricht nicht mehr heran.' }),
+      el('p', { class: 'hinweis', text: ohneEigenen
+        // Ohne eigenen Schlüssel wäre „nimm dich selbst mit" ein Rat, den man
+        // gar nicht befolgen kann — und der Hinweis auf die Folge zählt hier
+        // umso mehr: ohne eigenen Schlüssel liest man die eigene Nachricht nie
+        // wieder.
+        ? 'Füge den öffentlichen Schlüssel deines Gegenübers ein — nur wer hier steht, kann die '
+          + 'Nachricht später lesen. Du selbst kannst sie danach nicht mehr öffnen; dafür '
+          + 'bräuchtest du einen eigenen Schlüssel.'
+        : 'Nur wer hier steht, kann die Nachricht später lesen. Dich selbst mitzunehmen ist meist '
+          + 'sinnvoll — sonst kommst du an deine eigene Nachricht nicht mehr heran.' }),
       ...kaesten,
-      el('details', { class: 'ausklapp' },
-        el('summary', { text: 'Fremden öffentlichen Schlüssel einfügen' }),
-        el('p', { class: 'hinweis', text: 'Solange es keine Kontakte gibt (Phase 3), fügst du den Schlüssel deines Gegenübers hier ein.' }),
-        this.#fremdKey),
-      el('label', { class: 'empfaenger' }, sig,
+      // Ohne eigene Schlüssel ist dies das einzige Eingabefeld der Karte —
+      // dann steht es offen statt hinter einem Aufklapper.
+      ohneEigenen
+        ? el('div', { class: 'feld' },
+            el('label', { for: 'wz-fremd', text: 'Öffentlicher Schlüssel des Gegenübers' }),
+            this.#fremdKey)
+        : el('details', { class: 'ausklapp' },
+            el('summary', { text: 'Fremden öffentlichen Schlüssel einfügen' }),
+            el('p', { class: 'hinweis', text: 'Für jemanden, der nicht in deinen Kontakten steht — einmalig, ohne ihn aufzunehmen.' }),
+            this.#fremdKey),
+      ohneEigenen ? null : el('label', { class: 'empfaenger' }, sig,
         el('span', { text: 'Mit meinem Standardschlüssel signieren — der Empfänger sieht dann, dass es wirklich von dir ist' })));
   }
 

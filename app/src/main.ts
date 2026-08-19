@@ -36,6 +36,7 @@ const schluessel = new SchluesselAnsicht({
 const werkzeug = new WerkzeugAnsicht({
   client,
   beiEntsperren: () => { router.gehe({ ziel: 'schluessel' }); },
+  beiAnlegen: () => { router.gehe({ ziel: 'neu', schritt: 1 }); },
 });
 
 const postfach = new Postfach(client);

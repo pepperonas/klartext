@@ -116,7 +116,15 @@ body {
 
 /* ----------------------------------------------------------------- Haupt */
 
-.haupt { flex: 1; padding: var(--kt-raum-6) 0; }
+/* ⚠️ Als `.haupt` geschrieben traf diese Regel AUCH jeden Hauptknopf
+   (`.knopf.haupt`) — beide teilen sich den Klassennamen. Jeder solche Knopf in
+   einer Flex-Reihe wuchs dadurch auf den freien Platz: „Jemanden einladen"
+   spannte über die halbe Kontaktseite und las sich als Banner statt als Knopf,
+   und auf der Startseite war „Schlüssel anlegen" doppelt so breit wie sein
+   Nachbar. Gefunden durch Messen im Browser, nicht durch Lesen.
+
+   Deshalb am Element festgemacht: es gibt genau ein <main class="haupt">. */
+main.haupt { flex: 1; padding: var(--kt-raum-6) 0; }
 .ansicht { display: flex; flex-direction: column; gap: var(--kt-raum-4); }
 .ansicht-titel { margin: 0; font-size: 1.4rem; }
 
@@ -530,6 +538,74 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .warnkasten strong { font-size: 0.98rem; }
 .warnkasten .hinweis { color: var(--kt-text); }
 .warnkasten.mahnung { border-left-color: var(--kt-gefahr); background: var(--kt-gefahr-schwach); }
+
+/* Wie der Warnkasten, aber in der Akzentfarbe: er warnt nicht, er lädt ein.
+   Ein oranger Kasten über „du kannst hier sofort loslegen" läse sich als
+   Problem, wo keines ist. */
+.hinweiskasten {
+  border-left: 3px solid var(--kt-akzent);
+  background: var(--kt-akzent-schwach);
+  border-radius: var(--kt-r-klein);
+  padding: var(--kt-raum-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-2);
+}
+.hinweiskasten strong { font-size: 0.98rem; }
+.hinweiskasten .hinweis { color: var(--kt-text); }
+
+/* Eine Option, die zu einem Knopf daneben gehört — kleiner als eine
+   eigenständige Zeile, damit sie den Knopf nicht überstimmt. */
+.nebenwahl {
+  display: flex;
+  align-items: center;
+  gap: var(--kt-raum-2);
+  font-size: 0.86rem;
+  color: var(--kt-text-leise);
+  /* Die Trefferfläche bleibt bei 44 px, auch wenn die Schrift kleiner ist. */
+  min-height: 44px;
+}
+.nebenwahl input { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------- Aufgaben */
+
+/* Ein Knopf, der wie ein Verweis im Fliesstext aussieht — für Wege, die der
+   Router kennt und die keine Adresse brauchen. */
+.textlink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.textlink:hover { text-decoration-thickness: 2px; }
+
+/* Der Vorspann trägt den Satz über das Anliegen. */
+.vorspann { font-size: 1.06rem; }
+/* Ein Absatz, der sich sichtbar von der Liste darüber löst. */
+.abgesetzt { margin-top: var(--kt-raum-4); }
+
+.aufgabenkarte { border-left: 3px solid var(--kt-akzent); }
+.aufgabe {
+  display: flex;
+  align-items: center;
+  gap: var(--kt-raum-4);
+  padding-top: var(--kt-raum-3);
+  border-top: 1px solid var(--kt-kontur);
+}
+.aufgabe:first-of-type { border-top: 0; padding-top: 0; }
+/* Der Text nimmt den freien Raum, der Knopf behält seine Breite — sonst
+   rutscht er bei langem Text aus der Zeile. */
+.aufgabe-text { flex: 1 1 auto; min-width: 0; }
+.aufgabe-text strong { display: block; margin-bottom: var(--kt-raum-1); }
+.aufgabe .knopf { flex: 0 0 auto; }
+
+@media (max-width: 560px) {
+  .aufgabe { flex-direction: column; align-items: stretch; }
+}
 
 /* ------------------------------------------------------------ Wortproben */
 

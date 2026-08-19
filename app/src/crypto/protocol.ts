@@ -43,6 +43,14 @@ export interface KeyInfo {
   readonly hasBackup: boolean;
   /** ISO-Zeitstempel der letzten Sicherung, sonst null. */
   readonly backupAt: string | null;
+  /**
+   * Wann zuletzt ein Widerrufszertifikat ausgegeben wurde — oder null.
+   *
+   * ⚠️ Das ist ein Vermerk, kein Nachweis: die App kann nicht wissen, ob die
+   *    Datei noch existiert. Er dient dazu, die Aufgabe nicht ewig zu
+   *    wiederholen, nicht dazu, Sicherheit zu behaupten.
+   */
+  readonly widerrufAt: string | null;
 }
 
 export type VaultState = 'empty' | 'locked' | 'unlocked';

@@ -141,23 +141,27 @@ const positionen = await seite.$$eval('.wortprobe', (ns) =>
 for (let i = 0; i < proben.length; i++) await proben[i].fill(woerter[positionen[i] - 1] ?? '');
 const freiBeiRichtig = await seite.isEnabled('button:has-text("Schlüssel jetzt erzeugen")');
 
+// ⚠️ Hier standen die Zustände G (Widerruf) und H (Backup) des Assistenten.
+//    Beide sind seit dem Benutzbarkeits-Durchgang Aufgaben auf der
+//    Schlüsselseite; der Assistent endet beim erzeugten Schlüssel. Geprüft wird
+//    jetzt, dass die Aufgaben dort ANKOMMEN — sonst wären sie verschoben und
+//    verschwunden, was schlimmer wäre als der lange Assistent.
 await seite.click('button:has-text("Schlüssel jetzt erzeugen")');
-await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
+await seite.waitForSelector('.fingerprint', { timeout: 90_000 });
 l = await lage();
-pruefe('G · Anlegen, Widerruf', l, wegeHeraus(l));
-const weiterOhneDownload = await seite.isDisabled('.schritt-fuss button:has-text("Weiter")');
+pruefe('G · Schlüssel vorhanden', l, wegeHeraus(l));
 
-await seite.click('button:has-text("Widerrufszertifikat herunterladen")');
-await seite.click('.schritt-fuss button:has-text("Weiter")');
-await seite.waitForSelector('#backup-pw');
-l = await lage();
-pruefe('H · Anlegen, Backup', l, [...wegeHeraus(l), ...l.knoepfe.filter((k) => /Ohne Sicherung/.test(k))]);
-
-await seite.click('button:has-text("Ohne Sicherung fortfahren")');
-await seite.click('button:has-text("Verstanden")');
-await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
-l = await lage();
-pruefe('I · Schlüssel vorhanden', l, wegeHeraus(l));
+// Die verschobenen Schritte müssen als Aufgaben dastehen — mit Weg zur
+// Erledigung. ⚠️ KEIN eigener `pruefe`-Aufruf: das ist kein eigener Zustand,
+// sondern eine Zusicherung über die Schlüsselseite, die gerade geprüft wurde.
+// (Beim ersten Anlauf habe ich `pruefe` dafür missbraucht und der Lauf meldete
+// folgerichtig „kein Weg heraus" — der Helfer verlangt für einen Zustand
+// mindestens einen Ausgang, und eine Karte ist kein Zustand.)
+const aufgaben = await seite.locator('.aufgabenkarte .aufgabe').count();
+const aufgabenText = await seite.locator('.aufgabenkarte').innerText().catch(() => '');
+if (aufgaben < 2 || !/Widerruf/i.test(aufgabenText) || !/[Ss]ichern/.test(aufgabenText)) {
+  fehler.push(`die verschobenen Schritte fehlen als Aufgabe (${String(aufgaben)} gefunden)`);
+}
 const mahntOhneBackup = (await seite.locator('.warnkasten.mahnung').count()) > 0;
 
 // Werkzeug — der Bereich aus Phase 2.
@@ -240,7 +244,11 @@ const zusatz = [
   ['jeder Schritt hat eine eigene Adresse', /^\/neu\/\d+$/.test(schrittPfad)],
   ['falsches Wort sperrt das Weitergehen', gesperrtBeiFalsch],
   ['richtige Wörter geben es frei', freiBeiRichtig],
-  ['ohne Herunterladen kein Weitergehen beim Widerruf', weiterOhneDownload],
+  // ⚠️ Hier stand: „ohne Herunterladen kein Weitergehen beim Widerruf". Diesen
+  //    Riegel gibt es nicht mehr, weil der Schritt aus dem Assistenten heraus
+  //    ist. An seine Stelle tritt die Aufgabe auf der Schlüsselseite — und die
+  //    Zusicherung, dass sie erst verschwindet, wenn das Zertifikat da war.
+  ['der Widerruf steht als Aufgabe da', aufgabenText.includes('Widerrufszertifikat')],
   ['ohne Sicherung wird dauerhaft gemahnt', mahntOhneBackup],
   ['gesperrt bleiben die Schlüssel sichtbar', gesperrtZeigtSchluessel],
   ['gesperrt lässt sich der öffentliche Schlüssel weiterhin geben', oeffentlichAuchGesperrt],

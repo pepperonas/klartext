@@ -102,7 +102,14 @@ export class EinladungAnsicht {
         passt
           ? el('div', { class: 'einladung-qr' },
               qrAnzeige(url, { beschriftung: 'QR-Code mit deiner Einladung', stufe: 'L', kantenlaenge: 300 }),
-              el('p', { class: 'hinweis', text: 'Zum Abscannen, wenn ihr euch seht.' }))
+              // ⚠️ „Zum Abscannen" allein lud dazu ein, in klartext nach einem
+              //    Scanner zu suchen — den es für DIESEN Zweck nicht gibt (der
+              //    eingebaute prüft Fingerprints bestehender Kontakte). Eine
+              //    Einladung nimmt man an, indem die Kamera-App des Telefons
+              //    den Link öffnet. Also steht jetzt dabei, wer womit scannt.
+              el('p', { class: 'hinweis', text:
+                'Die andere Person scannt ihn mit der Kamera ihres Telefons — der Link öffnet '
+                + 'sich dann in ihrem Browser.' }))
           : el('div', { class: 'warnkasten' },
               el('strong', { text: 'Für einen QR-Code ist dieser Link zu lang.' }),
               el('p', {

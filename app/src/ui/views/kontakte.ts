@@ -264,7 +264,9 @@ export class KontakteAnsicht {
       }),
       feld,
       el('div', { class: 'feld' }, el('label', { for: 'kontakt-name', text: 'Wie heisst die Person für dich?' }), name),
-      el('button', { class: 'knopf', type: 'submit', text: 'Prüfen' }));
+      // „Prüfen" sagte nicht, was danach passiert — es entsteht ein Kontakt.
+      // Und als einziger Knopf seiner Karte ist er der Hauptknopf.
+      el('button', { class: 'knopf haupt', type: 'submit', text: 'Kontakt aufnehmen' }));
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
