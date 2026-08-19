@@ -272,7 +272,14 @@ export class WerkzeugAnsicht {
     });
 
     const sig = el('input', { type: 'checkbox', id: 'wz-sig' });
-    sig.checked = this.#signieren;
+    // ⚠️ Hier stand der Haken auch bei GESPERRTEM Bund angehakt da — signiert
+    //    wurde dann trotzdem nicht (`signiereMit` fällt auf null zurück), und
+    //    zwar wortlos. Der Absender glaubte an eine Unterschrift, der Empfänger
+    //    sah keine. Eine App, die Signaturen anbietet, darf eine zugesagte
+    //    Signatur nicht stillschweigend weglassen.
+    const kannSignieren = this.#status === 'unlocked' && this.#schluessel.length > 0;
+    sig.checked = this.#signieren && kannSignieren;
+    sig.disabled = !kannSignieren;
     sig.addEventListener('change', () => { this.#signieren = sig.checked; });
 
     this.#fremdKey.addEventListener('input', () => { this.#zeichneErkennung(); });
@@ -302,8 +309,11 @@ export class WerkzeugAnsicht {
             el('summary', { text: 'Fremden öffentlichen Schlüssel einfügen' }),
             el('p', { class: 'hinweis', text: 'Für jemanden, der nicht in deinen Kontakten steht — einmalig, ohne ihn aufzunehmen.' }),
             this.#fremdKey),
-      ohneEigenen ? null : el('label', { class: 'empfaenger' }, sig,
-        el('span', { text: 'Mit meinem Standardschlüssel signieren — der Empfänger sieht dann, dass es wirklich von dir ist' })));
+      ohneEigenen ? null : el('label', { class: `empfaenger${kannSignieren ? '' : ' gesperrt'}` }, sig,
+        el('span', {},
+          document.createTextNode('Mit meinem Standardschlüssel signieren — der Empfänger sieht dann, dass es wirklich von dir ist'),
+          kannSignieren ? null : el('span', { class: 'hinweis',
+            text: ' Dafür muss der Schlüsselbund entsperrt sein.' }))));
   }
 
   #empfaengerListe(): { anFingerprints: string[]; anArmored: string[] } {
@@ -322,14 +332,24 @@ export class WerkzeugAnsicht {
 
   async #verschluesseln(): Promise<void> {
     const { anFingerprints, anArmored } = this.#empfaengerListe();
+    // Genau EINMAL entscheiden, ob signiert wird — und dasselbe Ergebnis
+    // danach im Text melden. Vorher wurde die Bedingung an der Aufrufstelle
+    // gerechnet und nirgends erwähnt.
+    const signaturSchluessel =
+      this.#signieren && this.#status === 'unlocked' ? this.#standardFingerprint() : null;
     try {
       const { armored } = await this.#client.ruf('tool.verschluessele', {
         klartext: this.#eingabe.value,
         anFingerprints, anArmored,
-        signiereMit: this.#signieren && this.#status === 'unlocked' ? this.#standardFingerprint() : null,
+        signiereMit: signaturSchluessel,
       });
-      this.#zeigeErgebnis('Verschlüsselt', armored, 'zerfall',
-        'Das kannst du über jeden Kanal schicken — Signal, Mail, Matrix. Lesen kann es nur, wer oben steht.');
+      this.#zeigeErgebnis(
+        signaturSchluessel === null ? 'Verschlüsselt' : 'Verschlüsselt und signiert',
+        armored, 'zerfall',
+        'Das kannst du über jeden Kanal schicken — Signal, Mail, Matrix. Lesen kann es nur, wer oben steht.'
+        + (signaturSchluessel === null
+          ? ' Ohne Unterschrift — der Empfänger kann nicht prüfen, dass es von dir stammt.'
+          : ''));
     } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }
 
@@ -483,12 +503,17 @@ export class WerkzeugAnsicht {
         this.#melde(`Entschlüsselt: ${e.dateiname}${wohin}${signaturKurz(e.signaturen)}`, 'gut');
       } else {
         const { anFingerprints, anArmored } = this.#empfaengerListe();
+        // Wie beim Text: einmal entscheiden, dann dasselbe melden.
+        const signaturSchluessel =
+          this.#signieren && this.#status === 'unlocked' ? this.#standardFingerprint() : null;
         const e = await this.#client.ruf('datei.verschluessele', {
           datei, anFingerprints, anArmored,
-          signiereMit: this.#signieren && this.#status === 'unlocked' ? this.#standardFingerprint() : null,
+          signiereMit: signaturSchluessel,
         });
         const wohin = await legeAb(grossesZiel, e.daten, () => { ladeBinaer(e.dateiname, e.daten); });
-        this.#melde(`Verschlüsselt: ${e.dateiname}${wohin}`, 'gut');
+        this.#melde(
+          `${signaturSchluessel === null ? 'Verschlüsselt' : 'Verschlüsselt und signiert'}: ` +
+          `${e.dateiname}${wohin}`, 'gut');
       }
     } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }

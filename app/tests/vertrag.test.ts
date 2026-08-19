@@ -367,6 +367,21 @@ describe('Wortlaut', () => {
     expect(frage, 'das Ziel wird erst nach der Krypto-Arbeit erfragt').toBeLessThan(arbeit);
   });
 
+  it('eine zugesagte Signatur wird nie stillschweigend weggelassen', () => {
+    // ⚠️ Der Haken „Mit meinem Standardschlüssel signieren" stand bei
+    //    GESPERRTEM Bund angehakt da, signiert wurde aber nicht — wortlos.
+    //    Der Absender glaubte an eine Unterschrift, der Empfänger sah keine.
+    //    Drei Dinge halten das jetzt fest: der Haken ist dann gesperrt, die
+    //    Entscheidung faellt an EINER Stelle, und das Ergebnis nennt sie.
+    const quelle = pur(lies(SRC, 'ui', 'views', 'werkzeug.ts'));
+    expect(quelle).toMatch(/sig\.disabled = !kannSignieren/);
+    expect(quelle).toMatch(/const signaturSchluessel =/);
+    expect(quelle).toMatch(/'Verschlüsselt und signiert'/);
+    expect(quelle).toMatch(/Ohne Unterschrift/);
+    // Und die Bedingung darf nirgends mehr direkt am Aufruf haengen.
+    expect(quelle).not.toMatch(/signiereMit: this\.#signieren/);
+  });
+
   it('die Baukennung wird nicht ungeprueft angezeigt', () => {
     // Sie steht in einem Dokument, das vom Server kommt. Also gilt sie als
     // fremde Eingabe, auch wenn sie „nur" angezeigt wird.

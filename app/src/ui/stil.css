@@ -567,6 +567,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 }
 .nebenwahl input { flex: 0 0 auto; }
 
+/* Eine Wahl, die gerade nicht getroffen werden kann — sichtbar, damit man
+   weiss, dass es sie gibt, aber erkennbar ausser Betrieb. */
+.empfaenger.gesperrt { color: var(--kt-text-leise); }
+.empfaenger.gesperrt input { cursor: not-allowed; }
+
 /* ------------------------------------------------------------- Aufgaben */
 
 /* Ein Knopf, der wie ein Verweis im Fliesstext aussieht — für Wege, die der
