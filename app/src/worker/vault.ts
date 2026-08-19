@@ -217,10 +217,15 @@ export class Vault {
 
     const erzeugt = await erzeugeSchluessel(algorithm, userId, benutzte);
     const fingerprint = normalisiereFingerprint(erzeugt.privateKey.getFingerprint());
+    // Ohne Adresse darf hier kein "Martin <>" stehen. OpenPGP.js laesst eine
+    // leere E-Mail von sich aus weg — die Beschriftung muss das mitmachen.
+    const bezeichnung = userId.email.length > 0
+      ? `${userId.name} <${userId.email}>`
+      : userId.name;
 
     await this.#speichere({
       fingerprint,
-      label: `${userId.name} <${userId.email}>`,
+      label: bezeichnung,
       isDefault: vorhanden.length === 0,
       armoredPublic: erzeugt.armoredPublic,
       armoredSecret: erzeugt.armoredSecret,
@@ -236,7 +241,7 @@ export class Vault {
 
     const info = await beschreibeSchluessel(erzeugt.privateKey.toPublic(), {
       isDefault: vorhanden.length === 0,
-      label: `${userId.name} <${userId.email}>`,
+      label: bezeichnung,
     });
 
     return { info, revocationCertificate: erzeugt.revocationCertificate };

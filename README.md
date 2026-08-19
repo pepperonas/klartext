@@ -18,7 +18,8 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 **Phase 1 von 5 ist fertig** — der Krypto-Kern. Schlüssel erzeugen, ein
 Schlüsselbund mit Passphrase-Schutz und Zeitsperre, Import und Export in beide
-Richtungen zu GnuPG, Widerrufszertifikate.
+Richtungen zu GnuPG, Widerrufszertifikate. Läuft unter
+[klartext.celox.io](https://klartext.celox.io/).
 
 Werkzeug-Modus, Kontakte, Relay und die Auslieferung folgen; die Phasen stehen
 in [`PLAN.md`](PLAN.md).
@@ -33,6 +34,28 @@ Mail, Matrix. Braucht keinen Server und keine Verbindung.
 Briefkasten, der nur Ciphertext sieht. Das ist **Bequemlichkeit, kein
 Sicherheitsgewinn**, und die App sagt das an der Stelle, an der man es
 einschaltet.
+
+## Passphrasen, die man sich merken kann
+
+Die App schlägt Passphrasen vor, statt sie dich erfinden zu lassen: sechs Wörter
+aus einer **deutschen Diceware-Liste mit 7776 Einträgen** — 12,925 Bit je Wort,
+zusammen 77,5 Bit.
+
+* Gezogen aus `crypto.getRandomValues` mit **Rejection Sampling**. `% 7776` wäre
+  verzerrt; ein Test rechnet alle 65536 möglichen Werte durch und verlangt, dass
+  jedes Wort exakt gleich oft herauskommt.
+* Zu jedem Wort stehen die **Würfelaugen** dabei, damit du die Zuordnung in
+  `de-7776-v1.txt` nachschlagen kannst.
+* Wer der App nicht glauben will, **würfelt selbst** und trägt die Augen ein.
+* Für die Exportdatei gibt es stattdessen eine Zeichenkette ohne l/I/1 und O/0 —
+  die wird abgeschrieben, und ein verwechseltes Zeichen macht sie wertlos.
+
+Herkunft und Lizenz der Wortliste, samt einem ehrlichen Befund zur Wortauswahl:
+[`app/src/passphrase/HERKUNFT.md`](app/src/passphrase/HERKUNFT.md).
+
+Eine **E-Mail-Adresse braucht klartext nicht** — deine Identität ist der
+Fingerprint. Sie ist optional und nur sinnvoll, wenn du denselben Schlüssel auch
+für verschlüsselte E-Mail nutzen willst.
 
 ## Kryptografie
 
@@ -70,9 +93,9 @@ npm run test:alles   # dazu Browserlauf und Zugänglichkeit
 
 | Was | Umfang |
 |---|---|
-| Tests | 87, davon 18 gegen **echtes GnuPG** |
-| Browserlauf | 10 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
-| Zugänglichkeit | WCAG 2.1 A + AA, 6 Zustände (3 Ansichten × 2 Themen), 0 Verstöße |
+| Tests | 116, davon 18 gegen **echtes GnuPG** |
+| Browserlauf | 19 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
+| Zugänglichkeit | WCAG 2.1 A + AA, 12 Zustände (6 Ansichten × 2 Themen), 0 Verstöße |
 
 Die GPG-Testvektoren liegen unter `fixtures/gpg/` und stammen aus echtem GnuPG,
 nicht aus OpenPGP.js — ein Interop-Test gegen die eigene Bibliothek beweist

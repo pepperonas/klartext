@@ -8,6 +8,7 @@
 import type { CryptoClient } from '../../crypto/client.ts';
 import { KlartextError } from '../../crypto/errors.ts';
 import type { KeyAlgorithm, KeyInfo, VaultStatus } from '../../crypto/protocol.ts';
+import { Vorschlag } from '../components/vorschlag.ts';
 import { el, ersetze } from '../dom.ts';
 
 function gruppiere(fingerprint: string): string {
@@ -70,7 +71,7 @@ export class SchluesselAnsicht {
    *    Zertifikat, bevor der Nutzer sie zu Gesicht bekommt. Gefunden im echten
    *    Browserlauf; kein Test im Node-Umfeld haette das sehen koennen.
    */
-  #schritt: 'widerruf' | null = null;
+  #schritt: 'widerruf' | 'export' | null = null;
 
   constructor(client: CryptoClient) {
     this.#client = client;
@@ -90,6 +91,32 @@ export class SchluesselAnsicht {
   // ------------------------------------------------------------------ leer
 
   #zeichneLeer(): void {
+    const bestaetigung = el('label', { class: 'bestaetigung', hidden: true });
+    const haken = el('input', { type: 'checkbox', id: 'notiert' });
+    bestaetigung.appendChild(haken);
+    bestaetigung.appendChild(
+      el('span', { text: 'Ich habe die Passphrase notiert — an einem Ort, den ich wiederfinde.' }),
+    );
+
+    const absenden = el('button', { class: 'knopf haupt', type: 'submit', text: 'Schlüssel erzeugen' });
+
+    const vorschlag = new Vorschlag({
+      art: 'passphrase',
+      beiUebernahme: (text) => {
+        for (const id of ['pw', 'pw2']) {
+          const feld = form.querySelector<HTMLInputElement>(`#${id}`);
+          if (feld !== null) feld.value = text;
+        }
+        // ⚠️ Erst ab hier gilt die Bestätigungspflicht. Wer die Passphrase
+        //    selbst getippt hat, kennt sie; wer sie vorgeschlagen bekam,
+        //    hat sie vielleicht nur gesehen.
+        bestaetigung.hidden = false;
+        absenden.disabled = true;
+        haken.checked = false;
+      },
+    });
+    haken.addEventListener('change', () => { absenden.disabled = !haken.checked; });
+
     const form = el(
       'form',
       { class: 'form', novalidate: true },
@@ -100,8 +127,37 @@ export class SchluesselAnsicht {
           'Der Schlüssel entsteht in diesem Browser und bleibt hier. Die Passphrase schützt ihn — ' +
           'ohne sie kommt niemand an ihn heran, auch du nicht.',
       }),
-      feld('name', 'Name', 'text'),
-      feld('email', 'E-Mail', 'email'),
+
+      feld('name', 'Name oder Bezeichnung', 'text',
+        'Steht später sichtbar in deinem öffentlichen Schlüssel. Ein Spitzname tut es auch.'),
+
+      // ---- E-Mail ist OPTIONAL ------------------------------------------
+      // OpenPGP schreibt sie nirgends vor: gemessen mit gpg 2.5.21 — ein
+      // Schlüssel mit reinem Namen wird importiert, gelistet und man kann an
+      // ihn verschlüsseln. Die Adresse ist eine Konvention aus der Zeit, als
+      // PGP fast nur für E-Mail benutzt wurde.
+      el(
+        'details',
+        { class: 'ausklapp' },
+        el('summary', { text: 'E-Mail-Adresse hinzufügen (optional)' }),
+        el('p', {
+          class: 'hinweis',
+          text:
+            'Hier ist deine Identität der Fingerprint, nicht eine Adresse — für klartext ' +
+            'brauchst du keine. Sinnvoll ist sie nur, wenn du denselben Schlüssel auch für ' +
+            'verschlüsselte E-Mail nutzen willst; Programme wie Thunderbird suchen danach.',
+        }),
+        el('p', {
+          class: 'hinweis warnend',
+          text:
+            'Bedenke: Der Name steht unveränderlich im öffentlichen Schlüssel. Jede Kopie ' +
+            'trägt ihn weiter, und zurücknehmen lässt sich das nicht.',
+        }),
+        el('div', { class: 'feld' },
+          el('label', { for: 'email', text: 'E-Mail' }),
+          el('input', { id: 'email', type: 'email', autocomplete: 'off', spellcheck: 'false' })),
+      ),
+
       el(
         'div',
         { class: 'feld' },
@@ -117,9 +173,13 @@ export class SchluesselAnsicht {
           text: 'RSA-4096 versteht jedes GnuPG. Die Erzeugung kann eine Minute dauern.',
         }),
       ),
+
       feld('pw', 'Passphrase', 'password', 'Lang und einprägsam schlägt kurz und kryptisch.'),
+      el('div', { class: 'knopfreihe eng' }, vorschlag.knopf()),
+      vorschlag.wurzel,
       feld('pw2', 'Passphrase wiederholen', 'password'),
-      el('button', { class: 'knopf haupt', type: 'submit', text: 'Schlüssel erzeugen' }),
+      bestaetigung,
+      absenden,
     );
 
     form.addEventListener('submit', (e) => {
@@ -134,7 +194,10 @@ export class SchluesselAnsicht {
     if (pw !== wert(form, 'pw2')) { this.#melde('Die beiden Passphrasen sind nicht gleich.', 'gefahr'); return; }
     if (pw.length < 8) { this.#melde('Die Passphrase ist zu kurz — mindestens 8 Zeichen.', 'gefahr'); return; }
 
-    const knopf = form.querySelector('button');
+    // ⚠️ NICHT `form.querySelector('button')` — seit der Vorschlags-Knopf im
+    //    Formular steht, ist der erste Knopf nicht mehr der zum Absenden.
+    //    Der falsche wurde deaktiviert und umbeschriftet.
+    const knopf = form.querySelector<HTMLButtonElement>('button[type=submit]');
     if (knopf !== null) { knopf.disabled = true; knopf.textContent = 'Erzeuge…'; }
     this.#melde('Der Schlüssel wird erzeugt. Bei RSA-4096 kann das eine Minute dauern.', 'neutral');
 
@@ -245,32 +308,96 @@ export class SchluesselAnsicht {
   }
 
   async #exportiere(schluessel: KeyInfo, geheim: boolean): Promise<void> {
+    if (geheim) { this.#zeigeExport(schluessel); return; }
     try {
-      if (!geheim) {
-        const ergebnis = await this.#client.ruf('keys.export', {
-          fingerprint: schluessel.fingerprint,
-          secret: false,
-          exportPassphrase: null,
-        });
-        lade(ergebnis.filename, ergebnis.armored);
-        return;
-      }
-      const passphrase = prompt(
-        'Passphrase für die Exportdatei.\n\n' +
-        'Sie schützt die Datei außerhalb dieses Browsers. Das Exportformat ist ' +
-        'schwächer geschützt als der Schlüsselbund hier — anders kann GnuPG es nicht lesen.',
-      );
-      if (passphrase === null || passphrase.length === 0) return;
       const ergebnis = await this.#client.ruf('keys.export', {
         fingerprint: schluessel.fingerprint,
-        secret: true,
-        exportPassphrase: passphrase,
+        secret: false,
+        exportPassphrase: null,
       });
       lade(ergebnis.filename, ergebnis.armored);
-      this.#melde('Exportiert. Die Datei enthält deinen privaten Schlüssel — behandle sie entsprechend.', 'warnung');
     } catch (fehler) {
       this.#melde(fehlertext(fehler), 'gefahr');
     }
+  }
+
+  /**
+   * Export des privaten Schlüssels.
+   *
+   * Früher ein `prompt()` — das lässt sich weder gestalten noch mit der
+   * Tastatur vernünftig bedienen, und ein Vorschlagsfeld passt schon gar nicht
+   * hinein. Jetzt ein eigener Schritt, den ein Statuswechsel nicht wegräumt.
+   */
+  #zeigeExport(schluessel: KeyInfo): void {
+    this.#schritt = 'export';
+
+    const vorschlag = new Vorschlag({
+      art: 'passwort',
+      beiUebernahme: (text) => {
+        const feld = form.querySelector<HTMLInputElement>('#export-pw');
+        if (feld !== null) feld.value = text;
+      },
+    });
+
+    const form = el(
+      'form',
+      { class: 'form', novalidate: true },
+      el('h2', { text: 'Privaten Schlüssel ausführen' }),
+      el('p', { class: 'fingerprint', text: gruppiere(schluessel.fingerprint) }),
+      el('p', {
+        class: 'hinweis',
+        text:
+          'Die Datei enthält deinen privaten Schlüssel. Das Passwort schützt sie außerhalb ' +
+          'dieses Browsers — es ist nicht die Passphrase deines Schlüsselbunds und darf eine ' +
+          'andere sein.',
+      }),
+      el('p', {
+        class: 'hinweis warnend',
+        text:
+          'Der Export ist schwächer geschützt als der Schlüsselbund hier: er nutzt das ältere ' +
+          'Verfahren iterated+salted statt Argon2id. Anders kann GnuPG die Datei nicht lesen.',
+      }),
+      feld('export-pw', 'Passwort für die Datei', 'password'),
+      el('div', { class: 'knopfreihe eng' }, vorschlag.knopf()),
+      vorschlag.wurzel,
+      el(
+        'div',
+        { class: 'knopfreihe' },
+        knopfMit('Abbrechen', () => { void this.#zurueck(); }),
+        el('button', { class: 'knopf haupt', type: 'submit', text: 'Datei erzeugen' }),
+      ),
+    );
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void (async () => {
+        const passwort = wert(form, 'export-pw');
+        if (passwort.length < 8) {
+          this.#melde('Das Passwort ist zu kurz — mindestens 8 Zeichen.', 'gefahr');
+          return;
+        }
+        try {
+          const ergebnis = await this.#client.ruf('keys.export', {
+            fingerprint: schluessel.fingerprint,
+            secret: true,
+            exportPassphrase: passwort,
+          });
+          lade(ergebnis.filename, ergebnis.armored);
+          await this.#zurueck();
+          this.#melde('Ausgeführt. Behandle die Datei wie den Schlüssel selbst.', 'warnung');
+        } catch (fehler) {
+          this.#melde(fehlertext(fehler), 'gefahr');
+        }
+      })();
+    });
+
+    ersetze(this.wurzel, karte(form), this.#meldungsfeld());
+    form.querySelector('input')?.focus();
+  }
+
+  async #zurueck(): Promise<void> {
+    this.#schritt = null;
+    await this.zeichne(this.#client.status);
   }
 
   async #widerruf(schluessel: KeyInfo): Promise<void> {

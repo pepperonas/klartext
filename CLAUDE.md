@@ -33,11 +33,13 @@ Schlüssel oder eine Passphrase im Ruhezustand.
 ```
 app/src/crypto/     Vertrag + Client. Enthält KEIN openpgp (per Test gepinnt).
 app/src/worker/     Der einzige Ort mit openpgp. Vault, Schlüssel, Auto-Lock.
+app/src/passphrase/ Vorschlagsgenerator + deutsche Diceware-Liste (7776 Wörter).
 app/src/design/     tokens.ts = einzige Quelle für Farben/Maße/Federn.
 app/src/ui/         Ansichten. Kein innerHTML, kein localStorage.
 relay/              Phase 4.
 fixtures/gpg/       Von echtem GnuPG erzeugte Testvektoren.
 tools/e2e/          Browser-Prüfungen (Datenabfluss, Zugänglichkeit).
+deploy/             nginx-vhost + Ausliefer-Anleitung.
 ```
 
 ## Die zwei S2K-Formate — der Kern des Ganzen
@@ -54,6 +56,41 @@ AEAD, und AEAD auf v4-Schlüsseln ist ein Draft-Format, das GnuPG nicht liest.
 
 Der Export re-verschlüsselt beim Speichern-Klick — das setzt ohnehin einen
 entsperrten Vault voraus, kostet also nichts. Der Fingerprint bleibt gleich.
+
+## Passphrasen-Vorschläge
+
+Deutsche Diceware-Liste `de-7776-v1` (Herkunft, Lizenz und ein Befund zur
+Wortauswahl in `app/src/passphrase/HERKUNFT.md`). 12,925 Bit je Wort, sechs
+Wörter voreingestellt = 77,5 Bit.
+
+**Die einzige Stelle, an der man hier leise falsch liegen kann, ist die
+Gleichverteilung.** `zufall % 7776` ist verzerrt — 65536 = 8 × 7776 + 3328,
+also kämen die ersten 3328 Wörter je neun statt acht Mal vor. Deshalb Rejection
+Sampling, und der Test rechnet **alle 65536** Zwei-Byte-Werte durch, statt eine
+Stichprobe zu ziehen.
+
+⚠️ **Der erste Anlauf dieses Tests war wertlos** und blieb unter der Mutation
+grün: er sortierte die zu verwerfenden Werte selbst vorher aus und maß damit die
+eigene Annahme statt die Funktion. Jetzt zählt eine instrumentierte Quelle mit,
+ob die Funktion einen Wert genommen oder verworfen hat.
+
+**Nicht stillschweigend filtern.** Die App sagt „gleichverteilt über alle 7776
+Wörter" zu; wer einzelne Wörter unterdrückt, macht diesen Satz zur Unwahrheit,
+und niemand sähe es dem Ergebnis an. Begründung in `HERKUNFT.md`.
+
+## Die E-Mail-Adresse ist optional
+
+OpenPGP schreibt sie nirgends vor — **gemessen mit gpg 2.5.21**: ein Schlüssel
+mit reinem Namen wird importiert, gelistet, und man kann an ihn verschlüsseln.
+Sie ist eine Konvention aus der Zeit, als PGP fast nur für E-Mail benutzt wurde.
+
+Hier ist die Identität der Fingerprint. Und die User-ID steht **unveränderlich
+im öffentlichen Schlüssel**: jede Kopie trägt sie weiter, zurücknehmen lässt
+sich das nicht. Deshalb steht sie in einem Ausklapp-Bereich mit genau dieser
+Erklärung, statt als Pflichtfeld.
+
+OpenPGP.js verwirft eine leere Adresse von selbst (`{name, email: ''}` → `"Name"`);
+die Beschriftung im Vault muss das mitmachen, sonst steht dort `Name <>`.
 
 ## Regeln, die nicht verhandelbar sind
 
@@ -122,6 +159,7 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `kontrast.test.ts` | Beide Themen gegen WCAG-Schwellen. |
 | `armor.test.ts` | gpg-Eigenheiten beim Einfügen (siehe unten). |
 | `autolock.test.ts` | Der Sperr-Zeitgeber. |
+| `passphrase.test.ts` | Gleichverteilung (vollständig durchgerechnet), Würfel-Zuordnung, Prüfsumme der Wortliste. |
 
 **Regeln fürs Testschreiben in diesem Repo:**
 
@@ -172,6 +210,26 @@ sehen können.
 
 **Der Themawechsel braucht das Abschalten des Standard-Übergangs.** Siehe
 `.claude/rules/frontend-m3e.md`.
+
+**Vite bettet einen Worker als base64-`data:`-URL ein**, sobald sein Import
+nicht mehr dem wörtlichen `new Worker(new URL('…', import.meta.url))` entspricht
+— der eigene Chunk verschwindet dann, und mit ihm die Zusicherung, dass die
+Krypto woanders liegt. Deshalb läuft der Import über `?worker&url`. Marker- und
+Größenprüfung haben das NICHT bemerkt; es gibt jetzt einen eigenen Pin dafür.
+
+**`require-trusted-types-for 'script'` blockiert den `Worker`-Konstruktor.**
+Die App bringt eine Richtlinie mit (`klartext-worker`), die CSP lässt genau
+diesen einen Namen zu. Der E2E-Testserver sendet dieselbe CSP wie nginx, damit
+so etwas nicht erst in Produktion auffällt.
+
+**`form.querySelector('button')` ist nicht der Absenden-Knopf**, seit der
+Vorschlags-Knopf im Formular steht. Der falsche wurde deaktiviert und
+umbeschriftet — immer `button[type=submit]`.
+
+**Eine Größenschranke, die man bei jedem Anschlagen lockert, sichert nichts.**
+Als die Wortliste dazukam, sprang der Einstiegspunkt auf 94 kB. Statt die
+Schranke hochzusetzen, liegt die Liste jetzt in einem eigenen Chunk — wo sie
+ohnehin hingehört — und die Schranke wurde auf 40 kB *verschärft*.
 
 ## Was noch nicht da ist
 

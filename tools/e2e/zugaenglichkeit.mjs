@@ -75,28 +75,54 @@ async function pruefe(name, vorbereiten) {
 
 const alle = [
   ...(await pruefe('leerer Schlüsselbund', async () => { await new Promise((r) => setTimeout(r, 300)); })),
-  ...(await pruefe('Schlüssel angelegt', async (seite) => {
+  ...(await pruefe('Vorschlagsfeld offen', async (seite) => {
+    await seite.waitForSelector('#name');
+    await seite.click('.ausklapp summary');
+    await seite.click('button:has-text("Passphrase vorschlagen")');
+    await seite.waitForSelector('.vorschlag-wort');
+  })),
+  ...(await pruefe('Würfelmodus offen', async (seite) => {
+    await seite.waitForSelector('#name');
+    await seite.click('button:has-text("Passphrase vorschlagen")');
+    await seite.waitForSelector('.vorschlag-wort');
+    await seite.click('.vorschlag button:has-text("Selbst würfeln")');
+    await seite.waitForSelector('.wuerfelfeld');
+  })),
+  ...(await pruefe('Export mit Passwortvorschlag', async (seite) => {
     await seite.waitForSelector('#name');
     await seite.fill('#name', 'Prüfperson');
-    await seite.fill('#email', 'pruef@klartext.invalid');
     await seite.selectOption('#algo', 'curve25519');
     await seite.fill('#pw', 'eine-lange-passphrase');
     await seite.fill('#pw2', 'eine-lange-passphrase');
     await seite.click('button[type=submit]');
     await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
-    await seite.click('button.haupt');
+    await seite.click('button:has-text("Weiter")');
+    await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
+    await seite.click('button:has-text("Privaten Schlüssel")');
+    await seite.waitForSelector('#export-pw');
+    await seite.click('button:has-text("Passwort vorschlagen")');
+    await seite.waitForSelector('.passwort-vorschlag');
+  })),
+  ...(await pruefe('Schlüssel angelegt', async (seite) => {
+    await seite.waitForSelector('#name');
+    await seite.fill('#name', 'Prüfperson');
+    await seite.selectOption('#algo', 'curve25519');
+    await seite.fill('#pw', 'eine-lange-passphrase');
+    await seite.fill('#pw2', 'eine-lange-passphrase');
+    await seite.click('button[type=submit]');
+    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
+    await seite.click('button:has-text("Weiter")');
     await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
   })),
   ...(await pruefe('gesperrt', async (seite) => {
     await seite.waitForSelector('#name');
     await seite.fill('#name', 'Prüfperson');
-    await seite.fill('#email', 'pruef@klartext.invalid');
     await seite.selectOption('#algo', 'curve25519');
     await seite.fill('#pw', 'eine-lange-passphrase');
     await seite.fill('#pw2', 'eine-lange-passphrase');
     await seite.click('button[type=submit]');
-    await seite.waitForSelector('button.haupt', { timeout: 60_000 });
-    await seite.click('button.haupt');
+    await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
+    await seite.click('button:has-text("Weiter")');
     await seite.waitForSelector('.fingerprint', { timeout: 20_000 });
     await seite.click('.kopf-knoepfe button');
     await seite.waitForSelector('#pw');

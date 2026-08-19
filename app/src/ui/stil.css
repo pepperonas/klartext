@@ -199,3 +199,134 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
   from { clip-path: circle(0 at var(--kt-reveal-x) var(--kt-reveal-y)); }
   to   { clip-path: circle(var(--kt-reveal-r) at var(--kt-reveal-x) var(--kt-reveal-y)); }
 }
+
+/* ------------------------------------------------------- Vorschlagsfeld */
+
+.knopfreihe.eng { margin-top: 0; }
+
+.knopf.klein { min-height: 38px; font-size: 0.86rem; padding: 0 var(--kt-raum-3); }
+
+.vorschlag {
+  border: 1px solid var(--kt-kontur-stark);
+  border-radius: var(--kt-r-mittel);
+  padding: var(--kt-raum-4);
+  background: var(--kt-bg-erhaben);
+}
+.vorschlag[hidden] { display: none; }
+.vorschlag-inhalt { display: flex; flex-direction: column; gap: var(--kt-raum-3); }
+
+.vorschlag-woerter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kt-raum-3);
+}
+.vorschlag-wort {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--kt-raum-2) var(--kt-raum-3);
+  border-radius: var(--kt-r-klein);
+  background: var(--kt-flaeche-hoch);
+}
+/* Festbreitenschrift = "das ist Material, kein Fliesstext". Dieselbe Regel
+   wie bei Ciphertext und Fingerprints. */
+.vw-text {
+  font-family: var(--kt-schrift-mono);
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+.vw-wuerfel {
+  font-family: var(--kt-schrift-mono);
+  font-size: 0.72rem;
+  color: var(--kt-text-still);
+  letter-spacing: 0.12em;
+}
+
+.passwort-vorschlag {
+  font-size: 1.02rem;
+  word-break: break-all;
+  margin: 0;
+  padding: var(--kt-raum-3);
+  border-radius: var(--kt-r-klein);
+  background: var(--kt-flaeche-hoch);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--kt-raum-2); }
+.chip {
+  font: inherit;
+  font-size: 0.84rem;
+  min-height: 38px;
+  padding: 0 var(--kt-raum-3);
+  border-radius: var(--kt-r-voll);
+  border: 1px solid var(--kt-kontur-stark);
+  background: transparent;
+  color: var(--kt-text);
+  cursor: pointer;
+}
+.chip.an { background: var(--kt-akzent-schwach); border-color: var(--kt-akzent); color: var(--kt-akzent); }
+
+.hinweis.leise { color: var(--kt-text-still); }
+.hinweis.warnend { color: var(--kt-warnung); }
+
+/* --------------------------------------------------------- Würfelbereich */
+
+.wuerfelbereich {
+  margin-top: var(--kt-raum-3);
+  padding-top: var(--kt-raum-4);
+  border-top: 1px solid var(--kt-kontur);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kt-raum-3);
+}
+.wuerfelbereich h4 { margin: 0; font-size: 0.98rem; }
+.wuerfelgitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--kt-raum-2);
+}
+.wuerfelzeile { display: flex; align-items: center; gap: var(--kt-raum-2); }
+.wuerfelzeile > span { color: var(--kt-text-leise); font-size: 0.86rem; min-width: 1.5em; }
+.wuerfelfeld {
+  font-family: var(--kt-schrift-mono);
+  letter-spacing: 0.35em;
+  text-align: center;
+  padding: var(--kt-raum-2);
+}
+
+/* --------------------------------------------------------- Bestätigung */
+
+.bestaetigung {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kt-raum-3);
+  padding: var(--kt-raum-3);
+  border-radius: var(--kt-r-klein);
+  background: var(--kt-warnung-schwach);
+  font-size: 0.92rem;
+}
+.bestaetigung[hidden] { display: none; }
+.bestaetigung input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--kt-akzent);
+}
+
+/* ------------------------------------------------------------- Ausklapp */
+
+.ausklapp {
+  border: 1px solid var(--kt-kontur);
+  border-radius: var(--kt-r-klein);
+  padding: var(--kt-raum-3);
+}
+.ausklapp > summary {
+  cursor: pointer;
+  color: var(--kt-text-leise);
+  font-size: 0.92rem;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.ausklapp[open] > summary { margin-bottom: var(--kt-raum-3); color: var(--kt-text); }
+.ausklapp > *:not(summary) { margin-bottom: var(--kt-raum-3); }

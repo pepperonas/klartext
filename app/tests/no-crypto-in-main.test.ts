@@ -133,10 +133,16 @@ describe.runIf(DIST_DA)('gebauter Bundle', () => {
   it('der Einstiegspunkt ist klein genug, dass keine Kryptobibliothek darin sein KANN', () => {
     const einstieg = jsDateien(DIST).filter((f) => /index-/.test(f));
     expect(einstieg.length).toBe(1);
-    // openpgp wiegt gebaut ~330 kB. Ein Einstiegspunkt unter 80 kB kann sie
+    // openpgp wiegt gebaut ~330 kB. Ein Einstiegspunkt unter 40 kB kann sie
     // nicht enthalten — unabhaengig davon, welche Marker jemand kuenftig
     // umbenennt. Zweiter, stumpfer Riegel neben der Marker-Pruefung.
+    //
+    // ⚠️ Als die Wortliste dazukam, sprang der Einstiegspunkt auf 94 kB und
+    //    dieser Test wurde rot. Die Schranke einfach hochzusetzen haette ihn
+    //    entwertet; stattdessen liegt die Liste jetzt in einem eigenen Chunk,
+    //    wo sie ohnehin hingehoert (unveraenderliche Statik, eigener Cache).
+    //    Eine Schranke, die man bei jedem Anschlagen lockert, sichert nichts.
     const groesse = readFileSync(einstieg[0] ?? '', 'utf8').length;
-    expect(groesse).toBeLessThan(80_000);
+    expect(groesse).toBeLessThan(40_000);
   });
 });

@@ -30,6 +30,12 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
+        // Die Wortliste ist unveraenderliche Statik (72 kB) und hat im
+        // Anwendungs-Bundle nichts verloren: als eigener Chunk bleibt sie beim
+        // naechsten App-Update im Browser-Cache liegen, waehrend der Code neu
+        // geladen wird. Ausserdem behaelt die Groessenschranke in
+        // `tests/no-crypto-in-main.test.ts` damit ihre Aussagekraft.
+        manualChunks: (id) => (id.includes('de-7776-v1.txt') ? 'wortliste' : undefined),
       },
     },
     sourcemap: false,

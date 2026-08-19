@@ -129,10 +129,39 @@ await seite.goto(basis, { waitUntil: 'networkidle' });
 
 await seite.waitForSelector('#name', { timeout: 15_000 });
 await seite.fill('#name', MARKER.name);
+
+// E-Mail ist optional und steckt in einem Ausklapp-Bereich. Dass sie NICHT
+// verlangt wird, ist Teil der Zusage "Identität ist der Fingerprint".
+const emailSichtbar = await seite.isVisible('#email');
+await seite.click('.ausklapp summary');
 await seite.fill('#email', MARKER.email);
+
+// ---- Vorschlagsfeld: Wörter, Würfelzahlen, Bit-Angabe --------------------
+await seite.click('button:has-text("Passphrase vorschlagen")');
+await seite.waitForSelector('.vorschlag-wort', { timeout: 10_000 });
+const vorschlagWoerter = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
+const vorschlagWuerfel = await seite.$$eval('.vw-wuerfel', (ns) => ns.map((n) => n.textContent ?? ''));
+const bitZeile = (await seite.textContent('.vorschlag .hinweis')) ?? '';
+
+await seite.click('.vorschlag button:has-text("Nochmal")');
+const zweiterZug = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
+
+await seite.click('.vorschlag button:has-text("Selbst würfeln")');
+await seite.waitForSelector('.wuerfelfeld');
+const wuerfelfelder = await seite.locator('.wuerfelfeld').count();
+await seite.click('.vorschlag button:has-text("Würfeln schließen")');
+
+await seite.click('.vorschlag button:has-text("Übernehmen")');
+const uebernommen = await seite.inputValue('#pw');
+
+const gesperrtVorBestaetigung = await seite.isDisabled('button[type=submit]');
+await seite.check('#notiert');
+const freiNachBestaetigung = await seite.isEnabled('button[type=submit]');
+
+// Ab hier ist die uebernommene Passphrase das Geheimnis, das nirgends
+// auftauchen darf.
+MARKER.passphrase = uebernommen;
 await seite.selectOption('#algo', 'curve25519');
-await seite.fill('#pw', MARKER.passphrase);
-await seite.fill('#pw2', MARKER.passphrase);
 await seite.click('button[type=submit]');
 
 await seite.waitForSelector('textarea[aria-label="Widerrufszertifikat"]', { timeout: 60_000 });
@@ -178,6 +207,15 @@ server.close();
 // ------------------------------------------------------------------ Bericht
 
 const pruefungen = [
+  ['E-Mail ist nicht verlangt, sondern eingeklappt', !emailSichtbar],
+  ['Vorschlag liefert sechs Wörter', vorschlagWoerter.length === 6 && vorschlagWoerter.every((w) => /^[a-z]{3,}$/.test(w))],
+  ['zu jedem Wort stehen die Würfelaugen', vorschlagWuerfel.length === 6 && vorschlagWuerfel.every((w) => /^[1-6]{5}$/.test(w))],
+  ['die Entropie wird in Bit genannt', /\d+ Bit Entropie/.test(bitZeile)],
+  ['zweimal ziehen ergibt Verschiedenes', zweiterZug.join() !== vorschlagWoerter.join()],
+  ['Würfelmodus bietet ein Feld je Wort', wuerfelfelder === 6],
+  ['der Vorschlag landet erst nach Übernahme im Feld', uebernommen.split('-').length === 6],
+  ['ohne Bestätigung geht es nicht weiter', gesperrtVorBestaetigung],
+  ['nach Bestätigung schon', freiNachBestaetigung],
   ['Schlüssel erzeugt und Fingerprint angezeigt', /^[0-9A-F]{4}( [0-9A-F]{4}){9}$/.test(fingerprint)],
   ['Widerrufszertifikat ausgegeben', zertifikat.includes('BEGIN PGP PUBLIC KEY BLOCK')],
   ['Sperr-Anzeige meldet "offen"', kerbeOffen.includes('offen')],
