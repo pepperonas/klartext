@@ -7,67 +7,19 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// ⚠️ Die Attrappe stand hier wörtlich. Mit dem zweiten Nutzer (schritte.test)
+//    wäre daraus eine Kopie geworden, die auseinanderläuft.
+import { stubDokument, texte, type StubKnoten as Stub } from './domstub.ts';
+
 import type { VaultStatus } from '../src/crypto/protocol.ts';
-
-interface Stub {
-  tagName: string;
-  className: string;
-  textContent: string;
-  attribute: Record<string, string>;
-  dataset: Record<string, string>;
-  title: string;
-  childNodes: Stub[];
-  firstChild: Stub | null;
-  classList: { toggle: (n: string, an: boolean) => void };
-  appendChild: (k: Stub) => Stub;
-  removeChild: (k: Stub) => Stub;
-  addEventListener: (t: string, f: () => void) => void;
-  setAttribute: (n: string, w: string) => void;
-  removeAttribute: (n: string) => void;
-  klicke: () => void;
-}
-
-function stub(tag: string, text = ''): Stub {
-  let klick: (() => void) | null = null;
-  const klassen = new Set<string>();
-  const k: Stub = {
-    tagName: tag.toUpperCase(),
-    get className() { return [...klassen].join(' '); },
-    set className(w: string) { klassen.clear(); for (const t of w.split(/\s+/).filter(Boolean)) klassen.add(t); },
-    textContent: text,
-    attribute: {},
-    dataset: {},
-    title: '',
-    childNodes: [],
-    firstChild: null,
-    classList: { toggle: (n, an) => { if (an) klassen.add(n); else klassen.delete(n); } },
-    appendChild(kind) { k.childNodes.push(kind); k.firstChild = k.childNodes[0] ?? null; return kind; },
-    removeChild(kind) {
-      k.childNodes = k.childNodes.filter((c) => c !== kind);
-      k.firstChild = k.childNodes[0] ?? null; return kind;
-    },
-    addEventListener(t, f) { if (t === 'click') klick = f; },
-    setAttribute(n, w) { k.attribute[n] = w; },
-    removeAttribute(n) { k.attribute = Object.fromEntries(Object.entries(k.attribute).filter(([x]) => x !== n)); },
-    klicke() { klick?.(); },
-  };
-  return k;
-}
 
 beforeEach(() => {
   vi.resetModules();
   vi.useFakeTimers();
-  vi.stubGlobal('document', {
-    createElement: (t: string) => stub(t),
-    createTextNode: (t: string) => stub('#text', t),
-  });
+  vi.stubGlobal('document', stubDokument());
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-function texte(k: Stub): string[] {
-  if (k.childNodes.length === 0) return k.textContent.length > 0 ? [k.textContent] : [];
-  return k.childNodes.flatMap(texte);
-}
 
 describe('Navigationsleiste', () => {
   it('führt alle Bereiche in fester Reihenfolge', async () => {

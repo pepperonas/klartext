@@ -321,6 +321,8 @@ npm run a11y         # WCAG 2.1 A+AA über 6 Zustände (3 × 2 Themen)
 npm run relay        # Zustellung über zwei echte Browser gegen ein gebautes Relay
 npm run reproduzierbar  # zweimal bauen, Byte für Byte vergleichen
 npm run kopfzeilen   # Kopfzeilen der LAUFENDEN Seite (nach jedem Deploy)
+npm run erster-nutzen   # verschlüsseln ohne eigenen Schlüssel, gegen echtes gpg
+npm run bilder       # die Bilder der README aus der gebauten App erzeugen
 npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 ```
 
@@ -353,7 +355,11 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `wortabgleich.test.ts` | Fingerprint ↔ Wörter, über tausend Werte umkehrbar. |
 | `einladung.test.ts` | Nutzlast im Fragment, Ablauf, Länge, kein Vorbeilesen am Puffer. |
 | `kontakte.test.ts` | Schlüsselwechsel wird gemeldet, nie stillschweigend übernommen. |
-| `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit, Baukennung ↔ `build.json` ↔ Dateien, Reihenfolge der Nutzergeste. |
+| `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit, Baukennung ↔ `build.json` ↔ Dateien, Reihenfolge der Nutzergeste, eine zugesagte Signatur wird nie weggelassen. |
+| `kennung.test.ts` | **Der Vertrag zwischen App und Relay** — beide Ableitungen gegeneinander gerechnet, nicht gegen einen Nachbau. |
+| `verlauf.test.ts` | Der lokale Verlauf: Ciphertext auf der Platte, Reihenfolge, und dass ein kaputter Eintrag den Rest nicht mitnimmt. |
+| `schritte.test.ts` | Die Fortschrittsanzeige — vor allem ihre ARIA-Zusagen, denn die SIND für manche die Anzeige. |
+| `doku.test.ts` | Die README gegen das Repo: Badge-Zahlen, Bilder, Verweise, Befehle. |
 | `build-kennung.test.ts` | Die Kennung kommt vom Server — also geprüfte Form oder gar nichts. |
 | `datei-ziel.test.ts` | Der Weg auf die Platte, vor allem: jeder Fehlweg endet im Blob-Rückfall. |
 
@@ -369,6 +375,51 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
   im Einfügefeld und damit im Haupt-Bundle. Jetzt zählen nur Bezeichner, die es
   außerhalb der Bibliothek nicht gibt, plus eine Größenschranke als zweiter,
   stumpfer Riegel.
+
+## Die Dokumentation wird geprüft wie Code
+
+`doku.test.ts` rechnet die README gegen das Repo: die Zahl im Tests-Badge, die
+Zahl im Abhängigkeits-Badge, ob jeder verlinkte Pfad existiert, ob jeder
+genannte `npm run …`-Befehl in `package.json` steht, ob jedes Bild vorhanden ist
+und beschrieben wird.
+
+⚠️ Grund: **eine getippte Zahl veraltet still.** Es geht nichts kaputt, niemand
+merkt es, und das Repo behauptet einfach etwas Falsches. Genau so stand im
+Info-Screen „kommt in Phase 4", als Phase 4 lief.
+
+⚠️ Beim Testschreiben selbst gelernt: das Tests-Badge lässt sich aus dem
+Quelltext nur als **Untergrenze** zählen — `it.each` erzeugt zur Laufzeit mehr
+Tests, als dort zu sehen sind. Statt eine willkürliche Spanne zu erfinden,
+benennt der Test die Eigenschaft, die wirklich gilt: das Badge darf nie weniger
+nennen als statisch zählbar und höchstens ein Drittel darüber liegen.
+
+**Die Bilder werden erzeugt, nicht gemalt** (`node tools/bilder.mjs`): aus der
+gebauten App, im echten Browser, mit einem Wegwerf-Schlüssel. Ein montiertes
+Bild wäre eine Zusage, die der Quelltext nicht einlöst. Ein Test prüft ausserdem,
+dass in keinem Bild ein privater Schlüssel steckt und keines über 150 kB wiegt —
+GitHub zeigt sie mit rund 880 px, alles darüber ist Ballast (erster Anlauf:
+1,2 MB bei Faktor 2, jetzt 260 kB bei Faktor 1,5 plus `pngquant`).
+
+## Drei Mutationsproben, die MEINE Tests widerlegt haben
+
+Alle drei sahen aus wie gute Tests und waren keine:
+
+1. **Der Vertrag App ↔ Relay prüfte sich selbst.** Mein „unabhängiger Nachbau"
+   der Relay-Ableitung importierte den Präfix aus dem **App**-Modul — beide
+   Seiten bewegten sich also gemeinsam. Mutation (Präfix auf v2) ⇒ grün. Jetzt
+   wird die **echte** Relay-Funktion importiert und gegengerechnet; dieselbe
+   Mutation ⇒ 3 Tests rot.
+2. **Die Sortierung des Verlaufs war nie geprüft.** Meine Testdaten hiessen
+   `id-<zeit>-…`, und IndexedDB liefert nach Schlüsselreihenfolge — die stimmte
+   zufällig mit der Zeit überein. Mutation (Sortierung entfernt) ⇒ grün. Jetzt
+   läuft die Schlüsselreihenfolge der Zeit **entgegen**.
+3. **Die Attrappe verletzte die geprüfte Eigenschaft.** Der Ersatz-Ciphertext
+   hiess `GEHEIM:<klartext>` — und der Test wollte belegen, dass kein Klartext
+   auf der Platte landet. Er stand dort, weil ich ihn hineingeschrieben hatte.
+
+Die Lehre ist nicht „mehr mutieren", sondern: **die Probe muss die Eigenschaft
+treffen, die der Test behauptet** — und der Test darf seinen Gegenstand nicht
+selbst herstellen.
 
 ## Fallstricke, die schon zugeschnappt sind
 

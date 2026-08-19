@@ -1,5 +1,11 @@
 # klartext
 
+[![Prüfung](https://github.com/pepperonas/klartext/actions/workflows/pruefung.yml/badge.svg)](https://github.com/pepperonas/klartext/actions/workflows/pruefung.yml)
+[![Tests](https://img.shields.io/badge/Tests-557-2e9e8f)](#prüfen)
+[![Laufzeit-Abhängigkeiten](https://img.shields.io/badge/Laufzeit--Abh%C3%A4ngigkeiten-1-2e9e8f)](#abhängigkeiten)
+[![Lizenz](https://img.shields.io/badge/Lizenz-MIT-informational)](LICENSE)
+[![Offline](https://img.shields.io/badge/offline-f%C3%A4hig-2e9e8f)](#offline)
+
 **PGP im Browser. Dein privater Schlüssel bleibt auf diesem Gerät.**
 
 `klartext` verschlüsselt, entschlüsselt, signiert und prüft OpenPGP — vollständig
@@ -18,6 +24,8 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 **Alle Phasen sind umgesetzt**, dazu ein Benutzbarkeits-Durchgang.
 Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
+
+![Die Startseite von klartext: die Überschrift „Schick jemandem etwas, das unterwegs niemand lesen kann", darunter drei Stichpunkte zur GnuPG-Kompatibilität und zum Offline-Betrieb, und der Knopf „Schlüssel anlegen"](docs/bilder/start.png)
 
 * **Schlüssel** — erzeugen, Schlüsselbund mit Passphrase-Schutz und Zeitsperre,
   Import und Export in beide Richtungen zu GnuPG, Widerrufszertifikate
@@ -71,12 +79,30 @@ Signaturen kennen dabei **drei** Zustände, nicht zwei: *gültig*, *ungültig* u
 *Unterzeichner unbekannt*. Das dritte als „ungültig" darzustellen wäre eine
 Falschaussage — ohne den Schlüssel des Unterzeichners lässt sich nichts sagen.
 
+![Das Werkzeug nach dem Verschlüsseln: oben das Eingabefeld mit dem Klartext und der Erkennung „KLARTEXT", darunter unmittelbar die Ergebniskarte „Verschlüsselt und signiert" mit dem PGP-Block](docs/bilder/werkzeug-ergebnis.png)
+
+Die Überschrift des Ergebnisses sagt, was **wirklich** passiert ist:
+„Verschlüsselt" oder „Verschlüsselt und signiert". Eine zugesagte Unterschrift
+stillschweigend wegzulassen wäre der schlimmere Fehler — genau das ist hier
+einmal vorgekommen, und ein Test hält es seither fest.
+
+### Loslegen, bevor man sich festlegt
+
+Um jemandem etwas zu verschlüsseln, braucht man **keinen eigenen Schlüssel** —
+nur den öffentlichen des Gegenübers. Dasselbe gilt fürs Prüfen einer Signatur.
+Das Werkzeug steht deshalb sofort offen; gesperrt ist nur, was wirklich einen
+eigenen Schlüssel braucht, mit dem Grund daneben.
+
+![Das Werkzeug ohne eigenen Schlüssel: ein Hinweis „Du kannst hier sofort loslegen", das Eingabefeld, und unter den Knöpfen die Begründung, warum Signieren gesperrt ist](docs/bilder/werkzeug-ohne-schluessel.png)
+
 ## Kontakte, denen man trauen kann — oder eben nicht
 
 Einen Schlüssel zu haben heisst nicht zu wissen, wem er gehört. `klartext`
 markiert jeden Kontakt **dauerhaft** als unverifiziert, bis der Fingerprint über
 einen zweiten Kanal abgeglichen wurde — vorgelesen am Telefon in dreizehn
 deutschen Wörtern, oder abgescannt beim nächsten Treffen.
+
+![Der Einladungsschirm: ein QR-Code mit dem Einladungslink, darunter der Link selbst und ein Warnkasten „Der Link beweist nicht, von wem er kommt" mit dem eigenen Fingerprint](docs/bilder/einladung.png)
 
 Taucht unter bekanntem Namen ein **anderer** Schlüssel auf, bekommt das eine
 eigene Ansicht mit beiden Fingerprints nebeneinander. Von aussen lässt sich
@@ -102,6 +128,8 @@ zusammen 77,5 Bit.
 * Wer der App nicht glauben will, **würfelt selbst** und trägt die Augen ein.
 * Für die Exportdatei gibt es stattdessen eine Zeichenkette ohne l/I/1 und O/0 —
   die wird abgeschrieben, und ein verwechseltes Zeichen macht sie wertlos.
+
+![Der Passphrasen-Schritt beim Anlegen: sechs vorgeschlagene deutsche Wörter mit ihren Würfelaugen, Knöpfe für 5 bis 8 Wörter, andere Wörter und selbst tippen](docs/bilder/anlegen-passphrase.png)
 
 Herkunft und Lizenz der Wortliste, samt einem ehrlichen Befund zur Wortauswahl:
 [`app/src/passphrase/HERKUNFT.md`](app/src/passphrase/HERKUNFT.md).
