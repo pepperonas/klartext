@@ -73,10 +73,23 @@ describe('Stylesheet gegen Tokens', () => {
   //    und nennen dabei zwangsläufig Werte, die im Code verboten sind.
   const CSS_PUR = CSS_QUELLE.replace(/\/\*[\s\S]*?\*\//g, '');
 
-  it('benutzt keine fest verdrahteten Hex-Farben', () => {
-    // Fest verdrahtetes Weiß ist der häufigste Theme-Defekt überhaupt: es ist
+  it('benutzt keine fest verdrahteten Hex-Farben — ausser wo Weiss eine Sachaussage ist', () => {
+    // Fest verdrahtetes Weiss ist der häufigste Theme-Defekt überhaupt: es ist
     // nur so lange eine Kontur, wie der Grund dunkel ist.
-    const treffer = [...CSS_PUR.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
+    //
+    // ⚠️ EINE Ausnahme, und sie ist begründet: der Grund unter einem QR-Code
+    //    MUSS weiss sein, auch im dunklen Thema. Ein Scanner braucht den
+    //    Kontrast; ein QR-Code auf dunklem Grund ist für die meisten Geräte
+    //    unlesbar. Das ist Physik, keine Gestaltung.
+    const zeilen = CSS_PUR.split('\n');
+    const treffer = zeilen
+      .map((zeile, i) => ({ zeile, i }))
+      .filter(({ zeile }) => /#[0-9a-fA-F]{3,8}\b/.test(zeile))
+      .filter(({ i }) => {
+        const block = zeilen.slice(Math.max(0, i - 12), i + 1).join('\n');
+        return !/\.qr\s*\{/.test(block);
+      })
+      .map(({ zeile }) => zeile.trim());
     expect(treffer).toEqual([]);
   });
 

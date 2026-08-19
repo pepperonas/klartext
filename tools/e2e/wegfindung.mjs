@@ -123,6 +123,8 @@ await seite.waitForSelector('.vorschlag-woerter');
 l = await lage();
 pruefe('E · Anlegen, Passphrase', l, wegeHeraus(l));
 const woerter = await seite.$$eval('.vw-text', (ns) => ns.map((n) => n.textContent ?? ''));
+// So lautet die Passphrase — nach einem Neuladen brauchen wir sie wieder.
+const PASSPHRASE = woerter.join('-');
 
 await seite.click('button:has-text("Weiter")');
 await seite.waitForSelector('.wortproben');
@@ -182,8 +184,35 @@ l = await lage();
 pruefe('N · Werkzeug, Nachricht erkannt', l, wegeHeraus(l));
 const bietetEntschluesseln = l.knoepfe.some((k) => /^Entschlüsseln$/.test(k));
 
+// Kontakte — Phase 3.
+await seite.click('.nav-eintrag:has-text("Kontakte")');
+await seite.waitForSelector('#kontakt-key');
+l = await lage();
+pruefe('O · Kontakte, leer', l, wegeHeraus(l));
+
+await seite.click('button:has-text("Jemanden einladen")');
+await seite.waitForSelector('#einladung-url');
+l = await lage();
+pruefe('P · Einladung erzeugen', l, wegeHeraus(l));
+const einladungsUrl = await seite.inputValue('#einladung-url');
+
+// Die Einladung von der anderen Seite her öffnen — mit demselben Schlüssel,
+// damit der Weg vollständig durchlaufen wird.
+const fragment = einladungsUrl.slice(einladungsUrl.indexOf('#'));
+await seite.goto(`${basis}/e${fragment}`, { waitUntil: 'domcontentloaded' });
+await seite.waitForSelector('.woerter', { timeout: 20_000 });
+l = await lage();
+pruefe('Q · Einladung empfangen', l, wegeHeraus(l));
+const einladungZeigtWoerter = (await seite.locator('.wort').count()) === 13;
+
+// ⚠️ Nach dem `goto` ist der Schlüsselbund gesperrt — ein Neuladen verliert
+//    den entsperrten Zustand, und genau so soll es sein. Also wieder auf.
 await seite.click('.nav-eintrag:has-text("Schlüssel")');
-await seite.waitForSelector('.fingerprint');
+await seite.waitForSelector('#pw', { timeout: 20_000 });
+const gesperrtNachNeuladen = true;
+await seite.fill('#pw', PASSPHRASE);
+await seite.click('button[type=submit]');
+await seite.waitForSelector('.fingerprint', { timeout: 30_000 });
 
 // DER Zustand, um den es ging.
 await seite.click('.kopf-knoepfe button:has-text("Sperren")');
@@ -200,6 +229,9 @@ server.close();
 // ------------------------------------------------------------------ Bericht
 
 const zusatz = [
+  ['ein Neuladen sperrt den Schlüsselbund', gesperrtNachNeuladen],
+  ['die Einladung trägt die Nutzlast im Fragment', einladungsUrl.includes('/e#') && !einladungsUrl.includes('?')],
+  ['die empfangene Einladung zeigt dreizehn Abgleich-Wörter', einladungZeigtWoerter],
   ['Werkzeug bietet bei Klartext das Verschlüsseln an', bietetVerschluesseln],
   ['Werkzeug bietet bei einer Nachricht das Entschlüsseln an', bietetEntschluesseln],
   ['„Sperren" fehlt im leeren Schlüsselbund', !sperrenImLeeren],

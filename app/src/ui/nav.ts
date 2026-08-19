@@ -19,7 +19,7 @@ interface Eintrag {
 const EINTRAEGE: readonly Eintrag[] = [
   { text: 'Schlüssel', ziel: { ziel: 'schluessel' } },
   { text: 'Werkzeug', ziel: { ziel: 'werkzeug' } },
-  { text: 'Kontakte', ziel: null, notiz: 'kommt in Phase 3 — Schlüssel von Freunden, Fingerprint-Abgleich' },
+  { text: 'Kontakte', ziel: { ziel: 'kontakte' } },
   { text: 'Info', ziel: { ziel: 'info' } },
 ];
 
@@ -50,7 +50,13 @@ export class Navigation {
 
   markiere(weg: Weg): void {
     // Die Unterzustände von „Schlüssel" (anlegen, exportieren) gehören dorthin.
-    const aktiv = weg.ziel === 'info' ? 'info' : weg.ziel === 'werkzeug' ? 'werkzeug' : 'schluessel';
+    // Einladen und Empfangen gehören zu den Kontakten — sonst wirkt die
+    // Leiste dort wie ein fremder Ort.
+    const aktiv =
+      weg.ziel === 'info' ? 'info'
+      : weg.ziel === 'werkzeug' ? 'werkzeug'
+      : weg.ziel === 'kontakte' || weg.ziel === 'einladen' || weg.ziel === 'empfangen' ? 'kontakte'
+      : 'schluessel';
     for (const [name, knopf] of this.#knoepfe) {
       const an = name === aktiv;
       knopf.classList.toggle('an', an);

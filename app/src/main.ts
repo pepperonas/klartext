@@ -10,7 +10,9 @@ import { Router, type Weg } from './ui/router.ts';
 import { Schlosskerbe } from './ui/schlosskerbe.ts';
 import { AnlegenAblauf } from './ui/views/anlegen.ts';
 import { ExportAnsicht } from './ui/views/export.ts';
+import { EinladungAnsicht } from './ui/views/einladung.ts';
 import { infoAnsicht } from './ui/views/info.ts';
+import { KontakteAnsicht } from './ui/views/kontakte.ts';
 import { SchluesselAnsicht } from './ui/views/schluessel.ts';
 import { WerkzeugAnsicht } from './ui/views/werkzeug.ts';
 
@@ -31,6 +33,17 @@ const schluessel = new SchluesselAnsicht({
 const werkzeug = new WerkzeugAnsicht({
   client,
   beiEntsperren: () => { router.gehe({ ziel: 'schluessel' }); },
+});
+
+const kontakte = new KontakteAnsicht({
+  client,
+  beiEinladen: () => { router.gehe({ ziel: 'einladen' }); },
+});
+
+const einladung = new EinladungAnsicht({
+  client,
+  beiKontakte: () => { router.gehe({ ziel: 'kontakte' }); },
+  beiSchluessel: () => { router.gehe({ ziel: 'schluessel' }); },
 });
 
 const exportAnsicht = new ExportAnsicht({
@@ -132,9 +145,33 @@ function setzeInhalt(knoten: HTMLElement): void {
 
 async function zeige(weg: Weg): Promise<void> {
   nav.markiere(weg);
+  // ⚠️ Ein weiterlaufender Kamerastrom hinter einer verlassenen Ansicht wäre
+  //    unentschuldbar. Beim Wegnavigieren wird er ausdrücklich abgeschaltet.
+  if (weg.ziel !== 'kontakte') kontakte.verlasse();
   const status = client.status;
 
   if (weg.ziel === 'info') { setzeInhalt(infoAnsicht()); return; }
+
+  if (weg.ziel === 'kontakte') {
+    setzeInhalt(kontakte.wurzel);
+    await kontakte.zeichne(status);
+    return;
+  }
+
+  if (weg.ziel === 'einladen') {
+    setzeInhalt(einladung.wurzel);
+    await einladung.zeichneErzeugen();
+    return;
+  }
+
+  if (weg.ziel === 'empfangen') {
+    // ⚠️ Das Fragment wird aus location gelesen, nicht aus dem Weg — es soll
+    //    nirgends durch die App gereicht werden, wo es versehentlich in eine
+    //    Adresse oder ein Protokoll geraten könnte.
+    setzeInhalt(einladung.wurzel);
+    await einladung.zeichneEmpfangen(location.hash);
+    return;
+  }
 
   if (weg.ziel === 'werkzeug') {
     setzeInhalt(werkzeug.wurzel);

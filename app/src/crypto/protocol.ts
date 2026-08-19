@@ -155,6 +155,24 @@ export interface Ops {
     req: { datei: File; pruefeMit: readonly string[] };
     res: DateiErgebnis;
   };
+
+  'kontakte.liste': { req: Record<never, never>; res: readonly Kontakt[] };
+  /** Nimmt einen öffentlichen Schlüssel entgegen — armored oder binär. */
+  'kontakte.pruefe': {
+    req: { armored: string | null; binaer: Uint8Array | null; name: string };
+    res: KontaktAufnahme;
+  };
+  'kontakte.uebernimm': {
+    req: { armored: string | null; binaer: Uint8Array | null; name: string };
+    res: Kontakt;
+  };
+  'kontakte.verifiziere': { req: { fingerprint: string; bestaetigt: boolean }; res: Kontakt };
+  'kontakte.umbenennen': { req: { fingerprint: string; name: string }; res: Kontakt };
+  'kontakte.loesche': { req: { fingerprint: string }; res: readonly Kontakt[] };
+  /** Öffentlicher Schlüssel eines Kontakts, zum Verschlüsseln. */
+  'kontakte.schluessel': { req: { fingerprint: string }; res: { armored: string } };
+  /** Eigener öffentlicher Schlüssel binär — für den Einladungslink. */
+  'keys.exportBinaer': { req: { fingerprint: string }; res: { daten: Uint8Array } };
 }
 
 /** Was in einem eingefügten Block steckt — Grundlage der Werkzeug-Ansicht. */
@@ -202,6 +220,46 @@ export interface DateiErgebnis {
   readonly dateiname: string;
   readonly signaturen: readonly SignaturBefund[];
 }
+
+/**
+ * Wie sicher ist, dass dieser Schlüssel wirklich der Person gehört?
+ *
+ * ⚠️ `unverifiziert` ist kein Makel, sondern der ehrliche Normalfall: über
+ *    einen Kanal empfangene Schlüssel KÖNNEN untergeschoben sein. Die
+ *    Oberfläche markiert das dauerhaft, nicht nur beim Anlegen.
+ */
+export type Vertrauen = 'unverifiziert' | 'verifiziert';
+
+export interface Kontakt {
+  readonly fingerprint: string;
+  readonly name: string;
+  readonly userIds: readonly string[];
+  readonly algorithm: string;
+  readonly bits: number | null;
+  readonly curve: string | null;
+  readonly vertrauen: Vertrauen;
+  readonly angelegtAm: string;
+  readonly verifiziertAm: string | null;
+  readonly isRevoked: boolean;
+  /** Fingerprints, unter denen diese Person früher bekannt war. */
+  readonly frühereFingerprints: readonly string[];
+  /** Wörter zum Vorlesen — vom Worker gerechnet, damit die Liste dort bleibt. */
+  readonly woerter: readonly string[];
+}
+
+export type KontaktAufnahme =
+  | { readonly art: 'neu'; readonly kontakt: Kontakt }
+  | { readonly art: 'bekannt'; readonly kontakt: Kontakt }
+  | {
+      /**
+       * ⚠️ Derselbe Name, ein ANDERER Schlüssel. Das ist entweder ein neuer
+       *    Schlüssel derselben Person — oder jemand, der sich dazwischensetzt.
+       *    Wird niemals stillschweigend übernommen.
+       */
+      readonly art: 'schluesselwechsel';
+      readonly kontakt: Kontakt;
+      readonly bisher: Kontakt;
+    };
 
 export type Op = keyof Ops;
 export type ReqBody<K extends Op> = Ops[K]['req'];

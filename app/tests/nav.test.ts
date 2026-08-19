@@ -76,15 +76,16 @@ describe('Navigationsleiste', () => {
     expect(texte(nav.wurzel as unknown as Stub)).toEqual(['Schlüssel', 'Werkzeug', 'Kontakte', 'Info']);
   });
 
-  it('zeigt Kommendes als ausgegraut statt es zu verschweigen', async () => {
-    // Ein leerer Bildschirm wirkt kaputt, ein ausgegrauter Eintrag unfertig.
+  it('alle Bereiche der Phasen 1 bis 3 sind erreichbar', async () => {
+    // Ausgegraute Einträge gab es, solange Werkzeug und Kontakte fehlten. Was
+    // fertig ist, muss anklickbar sein — ein durchgestrichener Eintrag für
+    // etwas Vorhandenes wäre schlimmer als gar keiner.
     const { Navigation } = await import('../src/ui/nav.ts');
     const nav = new Navigation(() => { /* egal */ });
-    const kinder = (nav.wurzel as unknown as Stub).childNodes;
-    const kontakte = kinder.find((c) => c.textContent === 'Kontakte');
-    expect(kontakte?.className).toContain('aus');
-    expect(kontakte?.attribute['aria-disabled']).toBe('true');
-    expect(kontakte?.attribute['title']).toMatch(/Phase 3/);
+    for (const kind of (nav.wurzel as unknown as Stub).childNodes) {
+      expect(kind.tagName, kind.textContent).toBe('BUTTON');
+      expect(kind.className, kind.textContent).not.toContain('aus');
+    }
   });
 
   it('meldet den Wechsel mit dem richtigen Ziel', async () => {
@@ -92,12 +93,10 @@ describe('Navigationsleiste', () => {
     const gewaehlt: string[] = [];
     const nav = new Navigation((w) => gewaehlt.push(w.ziel));
     const kinder = (nav.wurzel as unknown as Stub).childNodes;
-    kinder.find((c) => c.textContent === 'Info')?.klicke();
-    kinder.find((c) => c.textContent === 'Werkzeug')?.klicke();
-    // Werkzeug ist inzwischen da, Kontakte noch nicht: ein ausgegrauter
-    // Eintrag darf NICHTS auslösen.
-    kinder.find((c) => c.textContent === 'Kontakte')?.klicke();
-    expect(gewaehlt).toEqual(['info', 'werkzeug']);
+    for (const text of ['Info', 'Werkzeug', 'Kontakte', 'Schlüssel']) {
+      kinder.find((c) => c.textContent === text)?.klicke();
+    }
+    expect(gewaehlt).toEqual(['info', 'werkzeug', 'kontakte', 'schluessel']);
   });
 
   it('markiert genau einen Eintrag', async () => {
@@ -111,14 +110,20 @@ describe('Navigationsleiste', () => {
   });
 
   it('rechnet die Unterzustände dem richtigen Bereich zu', async () => {
-    // Anlegen und Exportieren gehören zu „Schlüssel" — sonst wirkt die Leiste
-    // beim Anlegen wie ein fremder Ort.
+    // Anlegen und Exportieren gehören zu „Schlüssel", Einladen und Empfangen
+    // zu „Kontakte" — sonst wirkt die Leiste dort wie ein fremder Ort.
     const { Navigation } = await import('../src/ui/nav.ts');
     const nav = new Navigation(() => { /* egal */ });
     const kinder = (nav.wurzel as unknown as Stub).childNodes;
-    for (const weg of [{ ziel: 'neu' as const, schritt: 3 }, { ziel: 'export' as const, kurz: 'AB' }]) {
+    const faelle = [
+      [{ ziel: 'neu' as const, schritt: 3 }, 'Schlüssel'],
+      [{ ziel: 'export' as const, kurz: 'AB' }, 'Schlüssel'],
+      [{ ziel: 'einladen' as const }, 'Kontakte'],
+      [{ ziel: 'empfangen' as const }, 'Kontakte'],
+    ] as const;
+    for (const [weg, erwartet] of faelle) {
       nav.markiere(weg);
-      expect(kinder.find((c) => c.attribute['aria-current'] === 'page')?.textContent).toBe('Schlüssel');
+      expect(kinder.find((c) => c.attribute['aria-current'] === 'page')?.textContent).toBe(erwartet);
     }
   });
 });

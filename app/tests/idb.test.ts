@@ -10,7 +10,7 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DB_NAME, DB_VERSION, STORE_KEYS, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
+import { DB_NAME, DB_VERSION, STORE_CONTACTS, STORE_KEYS, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
 
 let db: IDBDatabase | null = null;
 
@@ -28,8 +28,9 @@ beforeEach(async () => { db = await frisch(); });
 afterEach(() => { db?.close(); db = null; });
 
 describe('Anlegen', () => {
-  it('legt beide Stores an', () => {
-    expect([...(db?.objectStoreNames ?? [])].sort()).toEqual([STORE_KEYS, STORE_SETTINGS].sort());
+  it('legt alle Stores an', () => {
+    expect([...(db?.objectStoreNames ?? [])].sort())
+      .toEqual([STORE_KEYS, STORE_SETTINGS, STORE_CONTACTS].sort());
   });
 
   it('führt die erwartete Version', () => {
@@ -101,5 +102,38 @@ describe('Migration', () => {
     db = await frisch();
     expect([...db.objectStoreNames]).toContain(STORE_KEYS);
     expect([...db.objectStoreNames]).toContain(STORE_SETTINGS);
+    expect([...db.objectStoreNames]).toContain(STORE_CONTACTS);
+  });
+
+  it('rüstet einen Bestand von Version 1 auf 2 nach — ohne Datenverlust', async () => {
+    // ⚠️ Genau hier verliert man Nutzerdaten, ohne es zu merken. Wer schon
+    //    Schlüssel hat, darf beim Aufstieg weder sie noch die neuen Stores
+    //    einbüssen. Das Durchfallen im switch ist dafür da.
+    db?.close();
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => { resolve(); };
+      req.onerror = () => { resolve(); };
+      req.onblocked = () => { resolve(); };
+    });
+
+    // Eine alte Datenbank von Hand aufbauen — so sah Phase 1 aus.
+    const alt = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore(STORE_KEYS, { keyPath: 'fingerprint' });
+        req.result.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
+      };
+      req.onsuccess = () => { resolve(req.result); };
+      req.onerror = () => { reject(req.error ?? new Error('offen fehlgeschlagen')); };
+    });
+    await schreibe(alt, STORE_KEYS, { fingerprint: 'ALT', label: 'Bestandsschlüssel' });
+    alt.close();
+
+    db = await oeffne();
+    expect(db.version).toBe(DB_VERSION);
+    expect([...db.objectStoreNames]).toContain(STORE_CONTACTS);
+    const zeile = await lies<{ label: string }>(db, STORE_KEYS, 'ALT');
+    expect(zeile?.label).toBe('Bestandsschlüssel');
   });
 });

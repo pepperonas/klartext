@@ -52,6 +52,11 @@ const server = createServer((req, res) => {
 await new Promise((r) => { server.listen(0, '127.0.0.1', r); });
 const basis = `http://127.0.0.1:${server.address().port}/`;
 
+// Ein echter öffentlicher Schlüssel aus den gpg-Fixtures — für die
+// Kontakt-Ansichten braucht es einen, der sich wirklich lesen lässt.
+const KONTAKT_SCHLUESSEL = await readFile(
+  join(HIER, '..', '..', 'fixtures', 'gpg', 'ed25519.pub.asc'), 'utf8');
+
 const browser = await chromium.launch({ headless: true });
 
 /** Prueft einen Zustand der App in beiden Themen. */
@@ -153,6 +158,30 @@ const alle = [
     await seite.click('button:has-text("Verschlüsseln")');
     await seite.waitForSelector('h3:has-text("Verschlüsselt")', { timeout: 30_000 });
     await seite.waitForTimeout(600);
+  })),
+  ...(await pruefe('Kontakte, leer', async (seite) => {
+    await bisSchluessel(seite);
+    await seite.click('.nav-eintrag:has-text("Kontakte")');
+    await seite.waitForSelector('#kontakt-key');
+  })),
+  ...(await pruefe('Einladung mit QR-Code', async (seite) => {
+    await bisSchluessel(seite);
+    await seite.click('.nav-eintrag:has-text("Kontakte")');
+    await seite.waitForSelector('#kontakt-key');
+    await seite.click('button:has-text("Jemanden einladen")');
+    await seite.waitForSelector('#einladung-url');
+  })),
+  ...(await pruefe('Fingerprint abgleichen', async (seite) => {
+    await bisSchluessel(seite);
+    await seite.click('.nav-eintrag:has-text("Kontakte")');
+    await seite.waitForSelector('#kontakt-key');
+    // Einen Kontakt anlegen, um die Abgleich-Ansicht zu erreichen.
+    await seite.fill('#kontakt-key', KONTAKT_SCHLUESSEL);
+    await seite.fill('#kontakt-name', 'Rosa');
+    await seite.click('button:has-text("Prüfen")');
+    await seite.waitForSelector('.kontakt', { timeout: 20_000 });
+    await seite.click('button:has-text("Fingerprint abgleichen")');
+    await seite.waitForSelector('.woerter');
   })),
   ...(await pruefe('gesperrt', async (seite) => {
     await bisSchluessel(seite);

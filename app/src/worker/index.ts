@@ -129,6 +129,25 @@ async function fuehreAus(anfrage: AnyRequest): Promise<unknown> {
         await vault.pruefSchluessel(anfrage.pruefeMit),
       );
 
+    // ------------------------------------------------------------- Kontakte
+
+    case 'kontakte.liste':
+      return await vault.kontakte.liste();
+    case 'kontakte.pruefe':
+      return await vault.kontakte.pruefe(anfrage.armored, anfrage.binaer, anfrage.name);
+    case 'kontakte.uebernimm':
+      return await vault.kontakte.uebernimm(anfrage.armored, anfrage.binaer, anfrage.name);
+    case 'kontakte.verifiziere':
+      return await vault.kontakte.verifiziere(anfrage.fingerprint, anfrage.bestaetigt);
+    case 'kontakte.umbenennen':
+      return await vault.kontakte.umbenennen(anfrage.fingerprint, anfrage.name);
+    case 'kontakte.loesche':
+      return await vault.kontakte.loesche(anfrage.fingerprint);
+    case 'kontakte.schluessel':
+      return { armored: await vault.kontakte.armored(anfrage.fingerprint) };
+    case 'keys.exportBinaer':
+      return { daten: await vault.binaerOeffentlich(anfrage.fingerprint) };
+
     default: {
       const unerreichbar: never = anfrage;
       throw new Error(`unbekannte Operation: ${JSON.stringify(unerreichbar)}`);

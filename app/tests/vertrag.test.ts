@@ -72,12 +72,24 @@ describe('Content-Security-Policy', () => {
     expect(offline).toContain(`trusted-types ${POLICY_NAME}`);
   });
 
-  it('gibt die Kamera nicht frei, solange nichts sie benutzt', () => {
-    // Phase 3 bringt das Abscannen von QR-Codes — DANN muss hier (self) stehen.
-    // Bis dahin ist die engste Einstellung die richtige.
-    expect(nginx).toMatch(/Permissions-Policy[^;]*camera=\(\)/);
-    const benutztKamera = alleTs(SRC).some((d) => /getUserMedia|BarcodeDetector/.test(pur(lies(d))));
-    expect(benutztKamera).toBe(false);
+  it('gibt genau die Kamera frei — und sonst nichts', () => {
+    // Seit Phase 3 wird sie zum Abscannen des Fingerprints gebraucht. Alles
+    // andere bleibt zu; eine Freigabe ohne Nutzung wäre unnötige Angriffsfläche.
+    expect(nginx).toMatch(/Permissions-Policy\s+"camera=\(self\)/);
+    for (const recht of ['microphone', 'geolocation', 'payment', 'usb', 'bluetooth']) {
+      expect(nginx, recht).toMatch(new RegExp(`${recht}=\\(\\)`));
+    }
+    const benutztKamera = alleTs(SRC).some((d) => /getUserMedia/.test(pur(lies(d))));
+    expect(benutztKamera).toBe(true);
+  });
+
+  it('schaltet die Kamera ausdrücklich wieder ab', () => {
+    // ⚠️ Ein weiterlaufender Kamerastrom hinter einer verlassenen Ansicht wäre
+    //    unentschuldbar — und man sieht ihn der App nicht an.
+    const scanner = pur(lies(SRC, 'ui', 'components', 'scanner.ts'));
+    expect(scanner).toMatch(/getTracks\(\)/);
+    expect(scanner).toMatch(/\.stop\(\)/);
+    expect(pur(lies(SRC, 'main.ts'))).toMatch(/kontakte\.verlasse\(\)/);
   });
 
   it('wiederholt die Header im index.html-Block', () => {
@@ -135,9 +147,13 @@ describe('Keine stillen Kanäle', () => {
   });
 
   it('kein Analyse-Werkzeug, keine Telemetrie', () => {
+    // ⚠️ Mit WORTGRENZEN. Die erste Fassung suchte Teilzeichenketten und schlug
+    //    auf `gueltigTage` an — kleingeschrieben steckt darin „gtag". Ein
+    //    Wächter, der Fehlalarme schlägt, wird irgendwann abgeschaltet, und
+    //    dann bewacht er nichts mehr.
     const alles = alleTs(SRC).map((d) => pur(lies(d))).join('\n');
-    for (const wort of ['analytics', 'gtag', 'sentry', 'umami', 'plausible', 'matomo']) {
-      expect(alles.toLowerCase()).not.toContain(wort);
+    for (const wort of ['analytics', 'gtag', 'sentry', 'umami', 'plausible', 'matomo', 'mixpanel']) {
+      expect(alles, wort).not.toMatch(new RegExp(`\\b${wort}\\b`, 'i'));
     }
   });
 

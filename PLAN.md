@@ -1,8 +1,8 @@
 # PLAN.md — `klartext`
 
 > Status: **Bestätigt und in Umsetzung.**
-> Phase 1 ✅ · Phase 2 ✅ · Phase 1.5 (Benutzbarkeit, siehe `PLAN-UX.md`) ✅
-> Phase 3–5 offen. Stand: 2026-08-19
+> Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 1.5 (Benutzbarkeit) ✅
+> Phase 4 (Relay) und 5 (Härtung) offen. Stand: 2026-08-19
 
 ---
 

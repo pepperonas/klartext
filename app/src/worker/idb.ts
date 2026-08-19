@@ -5,10 +5,11 @@
  */
 
 export const DB_NAME = 'klartext';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORE_KEYS = 'keys';
 export const STORE_SETTINGS = 'settings';
+export const STORE_CONTACTS = 'contacts';
 
 function warte<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -28,15 +29,20 @@ export function oeffne(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = request.result;
+      /* eslint-disable no-fallthrough */
+      // ⚠️ Das Durchfallen ist GEWOLLT — deshalb ist auch
+      //    `noFallthroughCasesInSwitch` in tsconfig.base.json abgeschaltet: wer von Version 0 kommt, muss alle
+      //    Stufen durchlaufen. Wer von 1 kommt, nur die ab 1. Ein `break` hier
+      //    liesse Bestandsnutzer ohne die neuen Stores zurück.
       switch (event.oldVersion) {
         case 0:
           db.createObjectStore(STORE_KEYS, { keyPath: 'fingerprint' });
           db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
-        // Phase 3 haengt hier `case 1:` fuer 'contacts' an, Phase 4 `case 2:`
-        // fuer 'messages'. Das Durchfallen ist gewollt: wer von Version 0
-        // kommt, braucht alle Stufen. Sobald ein zweiter Fall dazukommt,
-        // braucht dieser Block wieder ein `eslint-disable no-fallthrough`.
+        case 1:
+          db.createObjectStore(STORE_CONTACTS, { keyPath: 'fingerprint' });
+        // Phase 4 hängt hier `case 2:` für 'messages' an.
       }
+      /* eslint-enable no-fallthrough */
     };
 
     request.onsuccess = () => { resolve(request.result); };

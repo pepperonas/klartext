@@ -50,7 +50,8 @@ export default tseslint.config(
         // addInitScript() stehen zwar in dieser Datei, laufen aber im Browser.
         document: 'readonly', globalThis: 'readonly', navigator: 'readonly',
         location: 'readonly', WebSocket: 'readonly', EventSource: 'readonly',
-        getComputedStyle: 'readonly',
+        getComputedStyle: 'readonly', btoa: 'readonly', atob: 'readonly',
+        OffscreenCanvas: 'readonly',
         window: 'readonly',
       },
     },

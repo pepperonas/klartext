@@ -596,3 +596,58 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .ablage.bereit { border-color: var(--kt-akzent); background: var(--kt-akzent-schwach); }
 .ablage p { margin: 0; }
 .weg { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* --------------------------------------------------------------- Kontakte */
+
+.kontakt.verifiziert { border-left: 3px solid var(--kt-gut); }
+
+.abgleich {
+  display: grid;
+  gap: var(--kt-raum-5);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+  margin: var(--kt-raum-4) 0;
+}
+.abgleich h3 { margin: 0 0 var(--kt-raum-3); font-size: 1rem; }
+
+/* Die Wörter sind zum Vorlesen da — entsprechend gross und in
+   Festbreitenschrift, damit man die Stelle nicht verliert. */
+.woerter {
+  font-family: var(--kt-schrift-mono);
+  font-size: 1.05rem;
+  line-height: 1.9;
+  margin: 0;
+  padding-left: 2.2em;
+  columns: 2;
+  column-gap: var(--kt-raum-5);
+}
+.woerter.klein { font-size: 0.86rem; line-height: 1.6; columns: 1; }
+.woerter li::marker { color: var(--kt-text-still); font-size: 0.78em; }
+.wort { padding-left: var(--kt-raum-1); }
+
+.qr {
+  display: inline-block;
+  padding: var(--kt-raum-3);
+  border-radius: var(--kt-r-klein);
+  /* Heller Rahmen um den Code: Scanner brauchen den Kontrast, auch im
+     dunklen Thema. */
+  background: #ffffff;
+  line-height: 0;
+}
+.einladung-qr { display: flex; flex-direction: column; align-items: center; gap: var(--kt-raum-3); margin: var(--kt-raum-4) 0; }
+
+.fingerprint.klein { font-size: 0.78rem; }
+
+.gegenueber {
+  display: grid;
+  gap: var(--kt-raum-5);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: var(--kt-raum-4) 0;
+}
+.gegenueber h3 { margin: 0 0 var(--kt-raum-2); font-size: 0.98rem; }
+
+/* ---------------------------------------------------------------- Scanner */
+
+.scanbereich { display: flex; flex-direction: column; gap: var(--kt-raum-3); margin-top: var(--kt-raum-3); }
+.scanner { border-radius: var(--kt-r-mittel); overflow: hidden; background: var(--kt-bg); }
+.scanner-bild { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; object-fit: cover; }

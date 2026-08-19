@@ -25,6 +25,7 @@ import type {
 } from '../crypto/protocol.ts';
 import { STANDARD_EINSTELLUNGEN } from '../crypto/protocol.ts';
 import { AutoLock } from './autolock.ts';
+import { Kontaktbuch } from './kontakte.ts';
 import * as idb from './idb.ts';
 import {
   beschreibeSchluessel,
@@ -67,6 +68,14 @@ export class Vault {
   constructor(beiAenderung: () => void) {
     this.#beiAenderung = beiAenderung;
     this.#autoLock = new AutoLock(() => { this.sperre('idle'); });
+  }
+
+  #kontaktbuch: Kontaktbuch | null = null;
+
+  /** Das Kontaktbuch teilt sich die Datenbank mit dem Schlüsselbund. */
+  get kontakte(): Kontaktbuch {
+    this.#kontaktbuch ??= new Kontaktbuch(this.#datenbank);
+    return this.#kontaktbuch;
   }
 
   async starte(): Promise<void> {
@@ -316,6 +325,15 @@ export class Vault {
     };
   }
 
+  /** Der eigene öffentliche Schlüssel binär — für den Einladungslink. */
+  async binaerOeffentlich(fingerprint: string): Promise<Uint8Array> {
+    const zeile = await idb.lies<GespeicherterSchluessel>(
+      this.#datenbank, idb.STORE_KEYS, normalisiereFingerprint(fingerprint));
+    if (zeile === undefined) throw new KlartextError('KEY_NOT_FOUND');
+    const key = await leseOeffentlich(zeile.armoredPublic);
+    return key.write();
+  }
+
   async widerrufszertifikat(fingerprint: string): Promise<string> {
     return await erzeugeWiderrufszertifikat(this.#privaterSchluessel(fingerprint));
   }
@@ -405,10 +423,16 @@ export class Vault {
     return this.#privaterSchluessel(fingerprint);
   }
 
-  /** Prüfschlüssel: die eigenen plus zusätzlich eingefügte. */
+  /**
+   * Prüfschlüssel: die eigenen, ALLE Kontakte und zusätzlich eingefügte.
+   *
+   * Die Kontakte gehören dazu — sonst stünde bei jeder Nachricht eines
+   * Freundes „Unterzeichner unbekannt", obwohl sein Schlüssel danebenliegt.
+   */
   async pruefSchluessel(zusaetzlich: readonly string[]): Promise<Key[]> {
-    const eigene: Key[] = await this.oeffentliche();
-    for (const armored of zusaetzlich) eigene.push(await leseOeffentlich(armored));
-    return eigene;
+    const alle: Key[] = await this.oeffentliche();
+    alle.push(...(await this.kontakte.alleSchluessel()));
+    for (const armored of zusaetzlich) alle.push(await leseOeffentlich(armored));
+    return alle;
   }
 }

@@ -16,15 +16,17 @@ App leistet und was nicht. Was sie **nicht** kann, steht in
 
 ## Stand
 
-**Phase 1 und 2 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
+**Phase 1 bis 3 sind fertig**, dazu ein Benutzbarkeits-Durchgang.
 Läuft unter **[klartext.celox.io](https://klartext.celox.io/)**.
 
 * **Schlüssel** — erzeugen, Schlüsselbund mit Passphrase-Schutz und Zeitsperre,
   Import und Export in beide Richtungen zu GnuPG, Widerrufszertifikate
 * **Werkzeug** — Text und Dateien ver- und entschlüsseln, signieren, prüfen;
   offline-fähig als installierbare App
+* **Kontakte** — Einladungslinks, QR-Codes, Fingerprint-Abgleich in dreizehn
+  deutschen Wörtern, Warnung bei Schlüsselwechsel
 
-Kontakte, Relay und die Härtung folgen; die Phasen stehen in
+Relay und die Härtung folgen; die Phasen stehen in
 [`PLAN.md`](PLAN.md), der Benutzbarkeits-Plan in [`PLAN-UX.md`](PLAN-UX.md).
 
 ## Zwei Betriebsarten
@@ -48,6 +50,23 @@ was damit geht.
 Signaturen kennen dabei **drei** Zustände, nicht zwei: *gültig*, *ungültig* und
 *Unterzeichner unbekannt*. Das dritte als „ungültig" darzustellen wäre eine
 Falschaussage — ohne den Schlüssel des Unterzeichners lässt sich nichts sagen.
+
+## Kontakte, denen man trauen kann — oder eben nicht
+
+Einen Schlüssel zu haben heisst nicht zu wissen, wem er gehört. `klartext`
+markiert jeden Kontakt **dauerhaft** als unverifiziert, bis der Fingerprint über
+einen zweiten Kanal abgeglichen wurde — vorgelesen am Telefon in dreizehn
+deutschen Wörtern, oder abgescannt beim nächsten Treffen.
+
+Taucht unter bekanntem Namen ein **anderer** Schlüssel auf, bekommt das eine
+eigene Ansicht mit beiden Fingerprints nebeneinander. Von aussen lässt sich
+„neuer Schlüssel derselben Person" nicht von „jemand setzt sich dazwischen"
+unterscheiden — also entscheidest du, nicht die App. Und der neue Schlüssel ist
+danach wieder unverifiziert, auch wenn der alte es war.
+
+Der QR-Encoder ist selbst geschrieben (ISO/IEC 18004, Byte-Modus). Seine beiden
+abgeschriebenen Tabellen prüfen sich gegenseitig über eine geometrische
+Rechnung, und Chromes eigener Decoder liest die erzeugten Codes zurück.
 
 ## Passphrasen, die man sich merken kann
 
@@ -123,11 +142,12 @@ npm run test:alles   # dazu alle vier Browserläufe
 
 | Was | Umfang |
 |---|---|
-| Unit-Tests | **296** in 22 Dateien, davon 33 gegen **echtes GnuPG** |
+| Unit-Tests | **415** in 26 Dateien, davon 33 gegen **echtes GnuPG** |
 | Datenabfluss | 19 Kriterien, u. a. dass nichts Geheimes eine Anfrage verlässt |
-| Wegfindung | 27 Kriterien: kein Zustand ohne Ausweg, kein Knopf ohne Wirkung |
+| Wegfindung | 33 Kriterien: kein Zustand ohne Ausweg, kein Knopf ohne Wirkung |
 | Offline | 6 Kriterien — Schlüssel erzeugen und Nachrichten austauschen **ohne Netz** |
-| Zugänglichkeit | WCAG 2.1 A + AA, 18 Zustände (9 Ansichten × 2 Themen), 0 Verstöße |
+| QR-Codes | 7 Fälle, mit Chromes eigenem Decoder zurückgelesen |
+| Zugänglichkeit | WCAG 2.1 A + AA, 24 Zustände (12 Ansichten × 2 Themen), 0 Verstöße |
 
 Jede Zusicherung, die etwas verbietet, wurde einmal **mutiert** und beim
 Scheitern beobachtet — ein Test, den man nicht hat rot werden sehen, ist keine

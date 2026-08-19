@@ -22,9 +22,9 @@ Ziel: `klartext.celox.io`. Plan und Phasen in `PLAN.md`, Grenzen in
 
 ## Stand
 
-**Phase 1 (Krypto-Kern) und Phase 2 (Werkzeug) fertig**, dazu ein
-Benutzbarkeits-Durchgang (Phase 1.5). Phase 3–5 offen, siehe `PLAN.md` §10 und
-`PLAN-UX.md`.
+**Phase 1 (Krypto-Kern), Phase 2 (Werkzeug) und Phase 3 (Kontakte) fertig**,
+dazu ein Benutzbarkeits-Durchgang (Phase 1.5). Phase 4 (Relay) und 5 (Härtung)
+offen, siehe `PLAN.md` §10 und `PLAN-UX.md`.
 
 Live unter [klartext.celox.io](https://klartext.celox.io/).
 
@@ -39,6 +39,7 @@ app/src/crypto/     Vertrag + Client. Enthält KEIN openpgp (per Test gepinnt).
 app/src/worker/     Der einzige Ort mit openpgp. Vault, Schlüssel, Auto-Lock.
 app/src/passphrase/ Vorschlagsgenerator + deutsche Diceware-Liste (7776 Wörter).
 app/src/trusted.ts  Trusted-Types-Richtlinie für BEIDE Skript-Adressen.
+app/src/contacts/   QR-Encoder, Wortabgleich, Einladungslinks.
 app/src/design/     tokens.ts = einzige Quelle für Farben/Maße/Federn.
 app/src/ui/         Ansichten. Kein innerHTML, kein localStorage.
 relay/              Phase 4.
@@ -146,6 +147,64 @@ Die Shell läuft **network-first**: bei einer Krypto-App ist ein
 hängengebliebener alter Stand kein Schönheitsfehler, sondern ein Problem — eine
 ausgelieferte Korrektur muss ankommen. Nur `/assets/` (Inhalts-Hash im Namen,
 also unveränderlich) läuft cache-first.
+
+## Kontakte: unverifiziert ist der Normalfall
+
+Nicht der Sonderfall. Ein über einen Kanal empfangener Schlüssel KANN
+untergeschoben sein, und die Oberfläche markiert das **dauerhaft** — nicht nur
+beim Anlegen.
+
+**Ein Schlüsselwechsel wird nie stillschweigend übernommen.** Taucht unter
+bekanntem Namen ein anderer Schlüssel auf, bekommt das eine eigene Ansicht mit
+beiden Fingerprints nebeneinander. Von aussen ist „neuer Schlüssel derselben
+Person" nicht von „jemand setzt sich dazwischen" zu unterscheiden — also
+entscheidet der Mensch. Und der neue Schlüssel ist danach **wieder
+unverifiziert**, auch wenn der alte es war; sonst erbte ein untergeschobener
+Schlüssel das Vertrauen des echten.
+
+## Der QR-Encoder ist selbst geschrieben
+
+`app/src/contacts/qr.ts`, Byte-Modus, ISO/IEC 18004. Eine Bibliothek dafür
+hiesse, für 300 Zeilen Algorithmus einen unbekannten Codepfad in eine App zu
+lassen, deren Versprechen die kurze Abhängigkeitsliste ist.
+
+⚠️ Die zwei grossen Tabellen (Blockaufteilung, Ausrichtungsmuster) sind
+abgeschrieben und damit die wahrscheinlichste Fehlerquelle. Sie prüfen sich
+**gegenseitig**: `tests/qr.test.ts` rechnet die Gesamtzahl der Codewörter
+geometrisch aus Symbolgrösse und Funktionsmustern — und die Ausrichtungsmuster
+gehen in diese Rechnung ein. Ein Zahlendreher in einer der beiden bringt sie zum
+Platzen, für alle 40 Versionen × 4 Stufen. Zusätzlich liest `npm run qr` die
+erzeugten Codes mit Chromes `BarcodeDetector` zurück.
+
+## Der Fingerprint reist NICHT im Einladungslink mit
+
+Er wird beim Empfänger aus dem Schlüssel gerechnet. Ein mitgeschickter
+Fingerprint wäre eine zweite Wahrheit neben dem Schlüssel — und zwei Wahrheiten
+kann jemand auseinanderlaufen lassen. So ist ein Widerspruch strukturell
+unmöglich.
+
+⚠️ Die Nutzlast steht im **Fragment**. Fragmente schickt der Browser nie an
+einen Server: kein Zugriffsprotokoll, kein Proxy-Mitschnitt, keine
+Referrer-Zeile.
+
+⚠️ **Kompaktes Binärformat, nicht JSON.** Der erste Anlauf packte den
+ASCII-armored Schlüssel in JSON und kodierte das Ganze noch einmal base64 — ein
+RSA-4096-Link wurde **4606 Zeichen** lang. Jetzt sind es 3137, und selbst das
+passt in KEINEN QR-Code (Höchstmass 2953 Byte). Curve25519 wiegt 685 Zeichen
+und passt bequem. Die App sagt das im Klartext und macht daraus ein echtes
+Argument für Curve25519.
+
+## Die Wortliste ist deutsch, nicht die PGP Word List
+
+⚠️ **Abweichung von meiner Empfehlung aus Phase 0.** Dort hatte ich die
+englische PGP Word List vorgeschlagen. Die deutsche `de-7776-v1` liegt aber
+bereits im Repo, mit Prüfsumme festgenagelt und ohne Umlaute — für deutsche
+Ohren am Telefon das bessere Werkzeug. Interop-Zwang gibt es keinen: GnuPG kennt
+gar keine Wortliste für Fingerprints. Eine zweite Liste hätte 512 abgeschriebene
+englische Wörter bedeutet, also eine zweite Fehlerquelle für nichts.
+
+Verfahren: der Fingerprint als 160-Bit-Zahl in Basis 7776 — 13 Wörter tragen
+168 Bit. Umkehrbar, über tausend Zufallswerte hin und zurück geprüft.
 
 ## Wegfindung — keine Sackgassen
 
@@ -273,6 +332,10 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `tokens.test.ts` | Beide Themen vollständig, keine fest verdrahteten Farben im Stylesheet. |
 | `spring.test.ts` | Der Feder-Integrator — Stillstand bei reduzierter Bewegung, kein NaN nach Tabwechsel. |
 | `nav.test.ts` | Navigationsleiste und Sperr-Anzeige. |
+| `qr.test.ts` | Die zwei abgeschriebenen Tabellen prüfen sich gegenseitig, für alle 40 Versionen. |
+| `wortabgleich.test.ts` | Fingerprint ↔ Wörter, über tausend Werte umkehrbar. |
+| `einladung.test.ts` | Nutzlast im Fragment, Ablauf, Länge, kein Vorbeilesen am Puffer. |
+| `kontakte.test.ts` | Schlüsselwechsel wird gemeldet, nie stillschweigend übernommen. |
 | `vertrag.test.ts` | Zusicherungen ÜBER Dateigrenzen: CSP dreifach gleich, openpgp nur im Worker, keine stillen Kanäle, eine Laufzeit-Abhängigkeit. |
 
 **Regeln fürs Testschreiben in diesem Repo:**
@@ -353,6 +416,16 @@ Fehler passiert: ein Knopf sah aus wie ein Weg nach vorn und tat nichts (Widerru
 und der Zweig „selbst getippte Passphrase"). Gefunden von `wegfindung.mjs` und
 `offline.mjs` — die anderen Läufe kamen an diesen Zweigen nie vorbei.
 
+**Ein Teilzeichenketten-Wächter schlägt Fehlalarm.** Die Telemetrie-Prüfung
+suchte `gtag` als Teilzeichenkette und traf `gueltigTage` — kleingeschrieben
+steckt es darin. Ein Wächter mit Fehlalarmen wird irgendwann abgeschaltet, und
+dann bewacht er nichts mehr. Immer mit Wortgrenzen.
+
+**Die Kamera muss ausdrücklich abgeschaltet werden.** `getTracks().stop()` beim
+Verlassen der Ansicht — ein weiterlaufender Kamerastrom hinter einer
+geschlossenen Ansicht wäre unentschuldbar und sieht man der App nicht an.
+`main.ts` ruft `kontakte.verlasse()` bei jedem Wegnavigieren.
+
 **`aria-hidden` allein reicht nicht.** Ein `<input type=file>` bleibt
 fokussierbar; für Hilfsmittel unsichtbar, per Tabulator erreichbar ist eine
 Falle. Es braucht zusätzlich `tabindex="-1"`.
@@ -369,9 +442,6 @@ nachweislich enthält. Damit wächst sie mit.
 * **Eigene Schriften** (Inter + JetBrains Mono, OFL, auf Latein reduziert).
   Läuft weiter auf Systemschriften — der Typwechsel Proportional/Monospace
   trägt das Motiv auch so, das Subsetting steht noch aus.
-* **Kontakte** (Phase 3): Einladungslinks, QR, Fingerprint-Verifikation,
-  Trust-States. Bis dahin fügt man fremde öffentliche Schlüssel im Werkzeug
-  direkt ein.
 * **Relay** (Phase 4) und **Härtung/Build-Hash im UI** (Phase 5).
 * Dateien laufen durch den Arbeitsspeicher, nicht auf die Platte: die File
   System Access API fehlt noch, ab 100 MB warnt die Oberfläche ehrlich.
