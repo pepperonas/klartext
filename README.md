@@ -1,7 +1,7 @@
 # klartext
 
 [![Prüfung](https://github.com/pepperonas/klartext/actions/workflows/pruefung.yml/badge.svg)](https://github.com/pepperonas/klartext/actions/workflows/pruefung.yml)
-[![Tests](https://img.shields.io/badge/Tests-582-2e9e8f)](#prüfen)
+[![Tests](https://img.shields.io/badge/Tests-620-2e9e8f)](#prüfen)
 [![Laufzeit-Abhängigkeiten](https://img.shields.io/badge/Laufzeit--Abh%C3%A4ngigkeiten-1-2e9e8f)](#abhängigkeiten)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-informational)](LICENSE)
 [![Offline](https://img.shields.io/badge/offline-f%C3%A4hig-2e9e8f)](#offline)

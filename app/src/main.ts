@@ -11,6 +11,7 @@ import { Schlosskerbe } from './ui/schlosskerbe.ts';
 import { AnlegenAblauf } from './ui/views/anlegen.ts';
 import { ExportAnsicht } from './ui/views/export.ts';
 import { Postfach } from './relay/postfach.ts';
+import { Postfachwaechter } from './relay/waechter.ts';
 import { EinladungAnsicht } from './ui/views/einladung.ts';
 import { EinstellungenAnsicht } from './ui/views/einstellungen.ts';
 import { GespraechAnsicht } from './ui/views/gespraech.ts';
@@ -41,6 +42,25 @@ const werkzeug = new WerkzeugAnsicht({
 
 const postfach = new Postfach(client);
 
+/**
+ * Holt ab, egal welche Ansicht offen ist.
+ *
+ * ⚠️ Vorher lag das Abholen allein in der Gesprächsansicht. Wer noch keinen
+ *    Kontakt hatte, öffnete nie ein Gespräch — und bekam deshalb NIE mit, dass
+ *    jemand seine Einladung angenommen hat. Genau der gemeldete Fall.
+ */
+const waechter = new Postfachwaechter({
+  client,
+  postfach,
+  beiNeuem: () => {
+    // Neu zeichnen, damit Vorstellungen und Nachrichten sofort erscheinen …
+    void zeige(router.aktuell);
+    // … und am Ziel anzeigen, dass dort etwas wartet, auch wenn man gerade
+    // woanders ist.
+    void aktualisiereWartende();
+  },
+});
+
 const kontakte = new KontakteAnsicht({
   client,
   beiEinladen: () => { router.gehe({ ziel: 'einladen' }); },
@@ -58,6 +78,7 @@ const einstellungen = new EinstellungenAnsicht({
 });
 
 const einladung = new EinladungAnsicht({
+  postfach,
   beiEinladen: () => { router.gehe({ ziel: 'einladen' }); },
   client,
   beiKontakte: () => { router.gehe({ ziel: 'kontakte' }); },
@@ -189,6 +210,7 @@ async function zeige(weg: Weg): Promise<void> {
   if (weg.ziel === 'kontakte') {
     setzeInhalt(kontakte.wurzel);
     await kontakte.zeichne(status);
+    await aktualisiereWartende();
     return;
   }
 
@@ -233,6 +255,16 @@ async function zeige(weg: Weg): Promise<void> {
   await schluessel.zeichne(status);
 }
 
+/** Wie viele Vorstellungen warten — für die Zahl an „Kontakte". */
+async function aktualisiereWartende(): Promise<void> {
+  if (client.status.state !== 'unlocked') { nav.zeigeWartende(0); return; }
+  try {
+    nav.zeigeWartende((await client.ruf('vorstellungen.liste', {})).length);
+  } catch {
+    nav.zeigeWartende(0);
+  }
+}
+
 // -------------------------------------------------------------------- Start
 
 async function starte(): Promise<void> {
@@ -252,6 +284,11 @@ async function starte(): Promise<void> {
     // nichts tut, ist schlimmer als keiner — er behauptet eine Möglichkeit.
     document.querySelector('.kopf-knoepfe button')?.classList.toggle('weg', status.state !== 'unlocked');
 
+    // Der Wächter läuft nur bei entsperrtem Bund: gesperrt könnte er nichts
+    // entschlüsseln und würde alles als „unbekannt" ablegen — und eine offene
+    // Langabfrage verriete dem Server Anwesenheit, die ihn nichts angeht.
+    if (status.state === 'unlocked') waechter.starte(); else waechter.stoppe();
+
     if (status.state !== letzterZustand) {
       letzterZustand = status.state;
       void zeige(router.aktuell);
@@ -260,6 +297,7 @@ async function starte(): Promise<void> {
 
   router.starte((weg) => { void zeige(weg); });
   await client.aktualisiereStatus();
+  await aktualisiereWartende();
 }
 
 void starte();

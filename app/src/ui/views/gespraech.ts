@@ -26,6 +26,10 @@ function knopfMit(text: string, beiKlick: () => void, klasse = ''): HTMLButtonEl
   return knopf;
 }
 
+function warte(ms: number): Promise<void> {
+  return new Promise((fertig) => setTimeout(fertig, ms));
+}
+
 function zeitpunkt(ms: number): string {
   const d = new Date(ms);
   return `${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
@@ -284,10 +288,10 @@ export class GespraechAnsicht {
     }
   }
 
+  /** „Jetzt abholen" von Hand — der Wächter tut es sonst von selbst. */
   async #holeAb(wartenS: number): Promise<void> {
-    const kontakt = this.#kontakt;
-    if (kontakt === null || this.#eigener === null) return;
-    const ergebnis = await this.#postfach.holeNeues(this.#eigener.fingerprint, kontakt.fingerprint, wartenS);
+    if (this.#eigener === null) return;
+    const ergebnis = await this.#postfach.holeNeues(this.#eigener.fingerprint, wartenS);
     if (!ergebnis.ok) {
       if (wartenS === 0) this.#melde(ergebnis.fehler.meldung, 'gefahr');
       return;
@@ -296,21 +300,34 @@ export class GespraechAnsicht {
   }
 
   /**
-   * Lange Abfrage in Schleife — wacht auf, sobald etwas ankommt.
+   * Zeichnet neu, wenn der Wächter etwas gebracht hat.
    *
-   * ⚠️ Endet, sobald die Ansicht verlassen wird. Eine weiterlaufende Abfrage
-   *    hinter einer geschlossenen Ansicht hielte die Verbindung offen und
-   *    verriete dem Server Anwesenheit, die er nichts angeht.
+   * ⚠️ Hier lief einmal eine EIGENE Langabfrage. Seit der Postfachwächter
+   *    global abholt (damit auch ohne offenes Gespräch etwas ankommt), wäre
+   *    das ein zweiter Abholer am selben Postfach: beide fragen lange ab, die
+   *    Nachrichten verteilen sich zufällig auf die zwei, und wer gerade nicht
+   *    dran war, sieht nichts. Es darf nur einen geben.
+   *
+   *    Der langsame Takt hier ist deshalb kein Abholen mehr, sondern ein
+   *    Nachsehen im lokalen Verlauf — billig und ohne Netz.
    */
-  async #horche(): Promise<void> {
-    if (this.#abfrageLaeuft || this.#eigener === null) return;
-    const lage = await this.#postfach.lage(this.#eigener.fingerprint);
-    if (!lage.aktiv || !lage.eingerichtet) return;
+  #istVerlassen(): boolean {
+    return this.#verlassen;
+  }
 
+  async #horche(): Promise<void> {
+    if (this.#abfrageLaeuft) return;
     this.#abfrageLaeuft = true;
     try {
-      while (!this.#verlassen && this.#client.status.state === 'unlocked') {
-        await this.#holeAb(25);
+      while (!this.#istVerlassen() && this.#client.status.state === 'unlocked') {
+        await warte(1500);
+        // ⚠️ Nach dem Warten NOCH EINMAL nachsehen: `verlasse()` kann in der
+        //    Zwischenzeit gelaufen sein, und dann darf nichts mehr gezeichnet
+        //    werden. Über eine Methode, weil TypeScript ein Feld nach der
+        //    Schleifenbedingung auf `false` einengt und den zweiten Blick für
+        //    überflüssig hält — er ist es nicht.
+        if (this.#istVerlassen()) break;
+        await this.#zeichneGespraech();
       }
     } finally {
       this.#abfrageLaeuft = false;

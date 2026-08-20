@@ -10,7 +10,6 @@
  */
 
 import type { CryptoClient } from '../crypto/client.ts';
-import type { VerlaufsEintrag } from '../crypto/protocol.ts';
 import { pruefeHerkunft, RelayClient, type RelayErgebnis } from './client.ts';
 import { herausforderungsText, postfachKennung } from './kennung.ts';
 
@@ -89,11 +88,53 @@ export class Postfach {
    * ⚠️ Die Reihenfolge ist wichtig: erst lokal sichern, dann dem Server sagen,
    *    dass er löschen darf. Andersherum vernichtet ein Abbruch die Nachricht.
    */
+  /**
+   * Schickt die eigene Vorstellung an jemanden, dessen Schlüssel man gerade
+   * aufgenommen hat — damit die Aufnahme gegenseitig wird.
+   *
+   * ⚠️ Die Postfach-Kennung des Gegenübers lässt sich aus seinem Fingerprint
+   *    rechnen; es braucht also keinen Rückkanal und keine Verabredung. Ob
+   *    dort überhaupt ein Postfach eingerichtet ist, weiss man vorher nicht —
+   *    schlägt es fehl, sagt der Aufrufer es und bietet den Weg von Hand an.
+   */
+  async stelleDichVor(
+    eigenerFingerprint: string,
+    anFingerprint: string,
+  ): Promise<RelayErgebnis<{ id: string }>> {
+    const { nutzlast } = await this.#client.ruf('vorstellungen.baue', {
+      fingerprint: eigenerFingerprint,
+    });
+    // ⚠️ Über `anArmored`, nicht `anFingerprints`: die Auflösung eines
+    //    Fingerprints sucht ausschliesslich in den EIGENEN Schlüsseln, nicht
+    //    in den Kontakten. Mit `anFingerprints` scheiterte das Verschlüsseln
+    //    an einen Kontakt mit KEY_NOT_FOUND — und weil der Aufrufer den
+    //    Fehlschlag nur als „nicht zugestellt" verbuchte, blieb die
+    //    Vorstellung stumm in der Warteschlange liegen.
+    const kontaktSchluessel = await this.#client.ruf('kontakte.schluessel', {
+      fingerprint: anFingerprint,
+    });
+    const { armored } = await this.#client.ruf('tool.verschluessele', {
+      klartext: nutzlast,
+      anFingerprints: [],
+      anArmored: [kontaktSchluessel.armored],
+      // Signiert, damit die Gegenseite sieht, dass der Absender den privaten
+      // Teil des mitgeschickten Schlüssels wirklich besitzt.
+      signiereMit: eigenerFingerprint,
+    });
+    return await this.sende(anFingerprint, armored);
+  }
+
+  /**
+   * Holt alles ab, was im eigenen Postfach liegt.
+   *
+   * ⚠️ Ohne Gesprächspartner — der Aufruf hatte einmal einen, und genau darin
+   *    lag der Fehler: die Nachricht wurde dem zugeordnet, dessen Fenster
+   *    gerade offen war. Wer der Absender ist, entscheidet die Signatur.
+   */
   async holeNeues(
     eigenerFingerprint: string,
-    kontaktFingerprint: string,
     wartenS = 0,
-  ): Promise<RelayErgebnis<{ neue: number }>> {
+  ): Promise<RelayErgebnis<{ neue: number; vorstellungen: number }>> {
     const relay = this.#relay();
     if (relay === null) return { ok: false, fehler: { art: 'abgelehnt', meldung: 'Modus B ist nicht eingeschaltet.' } };
 
@@ -106,22 +147,27 @@ export class Postfach {
     const antwort = await relay.hole(kennung, token, wartenS);
     if (!antwort.ok) return antwort;
 
+    // ⚠️ Hier stand: jede ankommende Nachricht bekam `kontaktFp:
+    //    kontaktFingerprint` — also den Gesprächspartner, dessen Fenster
+    //    gerade offen war. Das Postfach gehört einem selbst, und jeder darf
+    //    hineinschreiben: sobald man mit zwei Leuten schrieb, landete eine
+    //    Nachricht von Bob im Gespräch mit Carol. Wer sie geschickt hat, steht
+    //    in der Signatur — dafür muss entschlüsselt werden, also entscheidet
+    //    das jetzt der Worker.
     const angekommen: string[] = [];
+    let vorstellungen = 0;
     for (const nachricht of antwort.wert.nachrichten) {
-      const eintrag: VerlaufsEintrag = {
-        id: `r:${nachricht.id}`,
-        kontaktFp: kontaktFingerprint,
-        richtung: 'ein',
-        ciphertext: nachricht.blob,
+      const ergebnis = await this.#client.ruf('verlauf.nimmAn', {
+        relayId: nachricht.id,
+        blob: nachricht.blob,
         zeit: nachricht.erstellt * 1000,
-        zugestellt: true,
-      };
-      await this.#client.ruf('verlauf.lege', { eintrag });
+      });
+      if (ergebnis.art === 'vorstellung') vorstellungen += 1;
       angekommen.push(nachricht.id);
     }
 
     // Erst jetzt darf der Server löschen.
     if (angekommen.length > 0) await relay.bestaetige(kennung, token, angekommen);
-    return { ok: true, wert: { neue: angekommen.length } };
+    return { ok: true, wert: { neue: angekommen.length, vorstellungen } };
   }
 }

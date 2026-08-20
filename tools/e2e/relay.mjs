@@ -29,6 +29,19 @@ const HIER = dirname(fileURLToPath(import.meta.url));
 const WURZEL = join(HIER, '..', '..');
 const DIST = join(WURZEL, 'app', 'dist');
 
+/**
+ * Fortschritt mit `SCHRITTE=1 npm run relay`.
+ *
+ * ⚠️ Fest eingebaut, nicht weggeworfen: bei zwei Browsern und einem echten
+ *    Server ist die Frage „wo hängt es?" die häufigste, und sie ohne Ausgabe zu
+ *    beantworten kostet jedes Mal eine halbe Stunde. Ich habe es einmal ohne
+ *    versucht.
+ */
+const T0 = Date.now();
+const schritt = (was) => {
+  if (process.env['SCHRITTE'] === '1') console.log(`  · ${was} (+${String(Date.now() - T0)}ms)`);
+};
+
 const GEHEIM = 'RELAY-KLARTEXT-MARKER-9c2f Hallo über den Zustellserver! Grüße.';
 
 // ------------------------------------------------------- Relay hochfahren
@@ -183,12 +196,27 @@ async function nimmEinladungAn(seite, url) {
   await seite.goto(`${basis}/e${fragment}`, { waitUntil: 'domcontentloaded' });
   await seite.waitForSelector('.woerter', { timeout: 20_000 });
   await seite.click('button:has-text("Kontakt aufnehmen")');
-  // ⚠️ Danach kommt nicht mehr die Liste, sondern der Hinweis auf die
-  //    Gegeneinladung: eine Einladung trägt nur den Schlüssel des Absenders,
-  //    die Aufnahme ist also einseitig. Hier wird sie weggeklickt — die
-  //    Gegenrichtung stellt dieser Lauf ohnehin selbst her.
-  await seite.click('button:has-text("Später")');
+
+  // ⚠️ Danach kommt nicht mehr die Liste, sondern der Abschluss-Schirm: eine
+  //    Einladung trägt nur den Schlüssel des Absenders. Mit Modus B merkt die
+  //    App die eigene Vorstellung vor („Zu den Kontakten"), ohne bleibt der
+  //    Weg von Hand („Später").
+  //
+  // ⚠️ ERST WARTEN, dann fragen. Ein `count()` unmittelbar nach dem Klick
+  //    liefert 0, weil das Zeichnen asynchron ist — der Lauf klickte dann auf
+  //    „Später", das es in diesem Zweig nie gibt, und hing für immer. Dieselbe
+  //    Falle steht schon anderswo in dieser Datei; ich bin trotzdem
+  //    hineingelaufen.
+  await seite.waitForSelector(
+    'button:has-text("Zu den Kontakten"), button:has-text("Später")',
+    { timeout: 30_000 });
+  const zurueckgeschickt =
+    await seite.locator('button:has-text("Zu den Kontakten")').count() > 0;
+  await seite.click(zurueckgeschickt
+    ? 'button:has-text("Zu den Kontakten")'
+    : 'button:has-text("Später")');
   await seite.waitForSelector('.kontakt', { timeout: 20_000 });
+  return zurueckgeschickt;
 }
 
 /**
@@ -231,20 +259,45 @@ for (const [name, seite] of [['Alice', alice], ['Bob', bob]]) {
 
 // ------------------------------------------------------------- Der Ablauf
 
-await legeSchluesselAn(alice, 'Alice', ALICE_PW);
-await modusBEin(alice);
-const aliceLink = await einladungsLink(alice);
+schritt('legeSchluesselAn'); await legeSchluesselAn(alice, 'Alice', ALICE_PW);
+schritt('modusBEin'); await modusBEin(alice);
+schritt('einladungsLink'); const aliceLink = await einladungsLink(alice);
 
-await legeSchluesselAn(bob, 'Bob', BOB_PW);
-await modusBEin(bob);
-const bobLink = await einladungsLink(bob);
+schritt('legeSchluesselAn'); await legeSchluesselAn(bob, 'Bob', BOB_PW);
+schritt('modusBEin'); await modusBEin(bob);
 
-// Gegenseitig aufnehmen (ein Neuladen sperrt — also danach entsperren).
-await nimmEinladungAn(alice, bobLink);
-await entsperre(alice, ALICE_PW);
-await nimmEinladungAn(bob, aliceLink);
-await entsperre(bob, BOB_PW);
+// ⚠️ Nur EINE Richtung von Hand: Bob nimmt Alices Einladung an. Ob Alice
+//    danach Bob sieht, OHNE selbst etwas zu tun, ist genau die Frage —
+//    gemeldet als „der neue Kontakt sieht mich, aber ich sehe ihn nicht".
+schritt('nimmEinladungAn'); await nimmEinladungAn(bob, aliceLink);
+// ⚠️ Entsperren ist hier kein Beiwerk: der Einladungslink lädt die Seite neu,
+//    danach ist Bobs Bund zu — und eine Vorstellung muss signiert werden. Sie
+//    wurde also nur vorgemerkt; erst jetzt kann der Wächter sie verschicken.
+schritt('entsperre'); await entsperre(bob, BOB_PW);
 
+// Alice tut NICHTS ausser dazusitzen: der Postfachwächter holt von selbst ab.
+// (Vorher lief das Abholen nur in einem offenen Gespräch — ohne Kontakt hatte
+// sie keines und hätte ewig gewartet.)
+schritt('Alice wartet auf die Vorstellung');
+await alice.click('.nav-eintrag:has-text("Kontakte")');
+const aliceSiehtVorstellung = await alice
+  .waitForSelector('.vorstellung', { timeout: 60_000 })
+  .then(() => true)
+  .catch(() => false);
+const aliceSiehtZaehler = await alice.locator('.nav-zaehler').count() > 0;
+const vorstellungNennt = aliceSiehtVorstellung
+  ? await alice.locator('.vorstellung').first().innerText()
+  : '';
+
+// Erst jetzt aufnehmen — sie soll nicht von selbst im Adressbuch landen.
+const vorherKontakte = await alice.locator('.kontakt').count();
+if (aliceSiehtVorstellung) {
+  await alice.click('.vorstellung button:has-text("Aufnehmen")');
+  await alice.waitForSelector('.kontakt', { timeout: 20_000 });
+}
+const nachherKontakte = await alice.locator('.kontakt').count();
+
+schritt('Bob öffnet das Gespräch');
 // Bob richtet sein Postfach ein und wartet.
 await bob.click('.nav-eintrag:has-text("Kontakte")');
 await bob.waitForSelector('.kontakt');
@@ -273,6 +326,7 @@ if (bobRichtetEin) {
 }
 const bobModusB = await bob.locator('.pille.gut:has-text("Modus B")').count() > 0;
 
+schritt('Alice schreibt');
 // Alice schreibt.
 await alice.click('.nav-eintrag:has-text("Kontakte")');
 await alice.waitForSelector('.kontakt');
@@ -290,6 +344,7 @@ await alice.waitForSelector('.meldung[data-art=gut]:has-text("Zugestellt")', { t
   .catch(() => undefined);
 const zustellMeldung = (await alice.textContent('.meldung[data-art=gut]')) ?? '';
 
+schritt('Bob wartet auf den Text');
 // Bob holt ab (die Langabfrage sollte ihn ohnehin wecken).
 await bob.waitForSelector('.blase.fremd', { timeout: 40_000 }).catch(() => undefined);
 const bobHatText = (await bob.locator('.blase.fremd .blase-text').first().textContent().catch(() => null)) ?? '';
@@ -298,6 +353,7 @@ const bobSignatur = await bob.locator('.blase.fremd .pille.gut:has-text("signier
 // Sieht das Relay den Klartext? Die Datei ist jetzt beschrieben.
 const rohDatei = readFileSync(relayDb, 'latin1');
 
+schritt('aufräumen');
 await browser.close();
 server.close();
 relay.kill();
@@ -310,6 +366,12 @@ const pruefungen = [
   ['Alice bekommt eine Zustellbestätigung', /zugestellt/i.test(zustellMeldung)],
   ['Bob empfängt den Text unverändert', bobHatText.trim() === GEHEIM],
   ['Bob sieht die Signatur als gültig', bobSignatur > 0],
+  ['Alice sieht von selbst, dass Bob angenommen hat', aliceSiehtVorstellung],
+  ['die Vorstellung nennt Bobs Namen', /Bob/.test(vorstellungNennt)],
+  ['die Vorstellung zeigt einen Fingerprint zum Abgleich', /[0-9A-F]{4} [0-9A-F]{4}/.test(vorstellungNennt)],
+  ['sie wird NICHT von selbst zum Kontakt', vorherKontakte === 0],
+  ['ein Tipp genügt, dann ist sie es', nachherKontakte === 1],
+  ['die Leiste zeigt, dass etwas wartet', aliceSiehtZaehler],
   ['die Relay-Datenbank enthält KEINEN Klartext', !rohDatei.includes('RELAY-KLARTEXT-MARKER')],
   ['die Relay-Datenbank enthält keinen Namen', !rohDatei.includes('Alice') && !rohDatei.includes('Bob')],
   ['keine Seitenfehler in beiden Browsern', fehler.length === 0],

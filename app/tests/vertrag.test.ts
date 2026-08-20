@@ -382,6 +382,47 @@ describe('Wortlaut', () => {
     expect(quelle).not.toMatch(/signiereMit: this\.#signieren/);
   });
 
+  it('eine abgeholte Nachricht wird dem ABSENDER zugeordnet, nicht dem offenen Fenster', () => {
+    // ⚠️ Der Fehler, der hier stand: `holeNeues(eigener, kontaktFingerprint)`
+    //    schrieb jede ankommende Nachricht dem Gespräch zu, das gerade offen
+    //    war. Das Postfach gehört einem selbst und steht jedem offen, der den
+    //    öffentlichen Schlüssel hat — sobald man mit zwei Leuten schrieb,
+    //    landete Bobs Nachricht bei Carol. Nichts stürzte dabei ab.
+    const postfach = pur(lies(SRC, 'relay', 'postfach.ts'));
+    // Der Client legt gar nichts mehr selbst ab; er reicht durch.
+    expect(postfach).not.toMatch(/kontaktFp:/);
+    expect(postfach).toMatch(/verlauf\.nimmAn/);
+    // Und `holeNeues` kennt den Gesprächspartner nicht mehr.
+    const signatur = /async holeNeues\(([\s\S]*?)\)/.exec(postfach)?.[1] ?? '';
+    expect(signatur).not.toMatch(/kontakt/i);
+
+    // Im Worker entscheidet die Signatur — und NUR eine gültige.
+    const vault = pur(lies(SRC, 'worker', 'vault.ts'));
+    expect(vault).toMatch(/zustand === 'gueltig'/);
+  });
+
+  it('eine Vorstellung wird nie stillschweigend zum Kontakt', () => {
+    // ⚠️ Jeder mit deinem öffentlichen Schlüssel darf dir schreiben. Würde ein
+    //    eingehender Schlüssel ungefragt eingetragen, könnte jeder deine
+    //    Kontaktliste mit frei gewählten Namen befüllen — und der
+    //    Fingerprint-Abgleich wäre dort ausgehebelt, wo er zählt.
+    const vault = pur(lies(SRC, 'worker', 'vault.ts'));
+    // Sie landet im eigenen Speicher …
+    expect(vault).toMatch(/STORE_INTROS/);
+    // … und wird erst auf ausdrückliche Anforderung zum Kontakt.
+    expect(vault).toMatch(/vorstellungAufnehmen/);
+
+    const idb = pur(lies(SRC, 'worker', 'idb.ts'));
+    expect(idb).toMatch(/STORE_INTROS = 'introductions'/);
+
+    // ⚠️ Der Wächter muss das SCHREIBEN treffen, nicht jede Erwähnung. Der
+    //    erste Anlauf schlug auf ein `lies(… STORE_CONTACTS, vorstellung…)`
+    //    an — die völlig richtige Prüfung, ob es den Kontakt schon gibt.
+    //    Dieselbe Sorte Fehlalarm wie früher bei „gtag" in „gueltigTage".
+    expect(vault).toMatch(/schreibe\([^)]*STORE_INTROS, vorstellung\)/);
+    expect(vault).not.toMatch(/schreibe\([^)]*STORE_CONTACTS, vorstellung/);
+  });
+
   it('die Baukennung wird nicht ungeprueft angezeigt', () => {
     // Sie steht in einem Dokument, das vom Server kommt. Also gilt sie als
     // fremde Eingabe, auch wenn sie „nur" angezeigt wird.

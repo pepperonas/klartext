@@ -11,7 +11,7 @@
  */
 
 import type { CryptoClient } from '../../crypto/client.ts';
-import type { Kontakt, VaultStatus } from '../../crypto/protocol.ts';
+import type { Kontakt, VaultStatus, Vorstellung } from '../../crypto/protocol.ts';
 import { qrAnzeige } from '../components/qr-anzeige.ts';
 import { Scanner, scannenMoeglich } from '../components/scanner.ts';
 import { el, ersetze } from '../dom.ts';
@@ -61,12 +61,17 @@ export class KontakteAnsicht {
   async #zeichneListe(): Promise<void> {
     const kontakte = await this.#client.ruf('kontakte.liste', {});
     const unverifiziert = kontakte.filter((k) => k.vertrauen === 'unverifiziert');
+    const vorstellungen = await this.#client.ruf('vorstellungen.liste', {}).catch(() => []);
 
     ersetze(
       this.wurzel,
       el('div', { class: 'kopfzeile ansicht-kopf' },
         el('h2', { class: 'ansicht-titel', text: 'Kontakte' }),
         knopfMit('Jemanden einladen', () => { this.#beiEinladen(); }, 'haupt')),
+
+      // Ganz oben: wer geantwortet hat. Genau darum ging es — man soll sehen,
+      // dass die Einladung angekommen ist, ohne danach zu suchen.
+      ...vorstellungen.map((v) => this.#vorstellungsKarte(v)),
 
       kontakte.length === 0
         ? el('section', { class: 'karte' },
@@ -96,6 +101,53 @@ export class KontakteAnsicht {
       this.#einfuegeKarte(),
       this.#meldung,
     );
+  }
+
+  /**
+   * „Hat deine Einladung angenommen."
+   *
+   * ⚠️ Bewusst NICHT automatisch aufgenommen. Das Postfach steht jedem offen,
+   *    der den öffentlichen Schlüssel hat — würde ein eingehender Schlüssel
+   *    ungefragt eingetragen, könnte jeder eine Kontaktliste mit frei
+   *    gewählten Namen befüllen. Ein Tipp genügt, aber es ist ein Tipp.
+   */
+  #vorstellungsKarte(v: Vorstellung): HTMLElement {
+    return el('section', { class: 'karte vorstellung' },
+      el('div', { class: 'kopfzeile' },
+        el('h3', { text: `${v.name} hat deine Einladung angenommen` }),
+        el('span', { class: 'pille', text: 'neu' })),
+      el('p', { class: 'hinweis', text:
+        `Den Namen hat ${v.name} selbst angegeben — überprüfbar ist er nicht. `
+        + 'Wer dahintersteckt, sagt allein der Fingerprint.' }),
+      el('p', { class: 'fingerprint', text: gruppiert(v.fingerprint) }),
+      v.selbstSigniert
+        ? el('p', { class: 'hinweis', text:
+            'Die Nachricht war mit genau diesem Schlüssel unterschrieben — der Absender besitzt '
+            + 'also den privaten Teil. Wer er ist, sagt das nicht.' })
+        : el('p', { class: 'hinweis warnend', text:
+            'Die Nachricht war NICHT mit diesem Schlüssel unterschrieben. Das muss nichts '
+            + 'heissen, ist aber ein Grund, genauer nachzufragen.' }),
+      el('div', { class: 'knopfreihe' },
+        knopfMit('Aufnehmen', () => { void this.#nimmVorstellungAuf(v); }, 'haupt'),
+        knopfMit('Weg damit', () => { void this.#verwirfVorstellung(v); })));
+  }
+
+  async #nimmVorstellungAuf(v: Vorstellung): Promise<void> {
+    try {
+      await this.#client.ruf('vorstellungen.nimmAuf', { fingerprint: v.fingerprint });
+      await this.#zeichneListe();
+      this.#melde(
+        `${v.name} ist jetzt in deinen Kontakten — noch nicht verifiziert. `
+        + 'Gleicht den Fingerprint über einen zweiten Kanal ab.', 'gut');
+    } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
+  }
+
+  async #verwirfVorstellung(v: Vorstellung): Promise<void> {
+    try {
+      await this.#client.ruf('vorstellungen.verwirf', { fingerprint: v.fingerprint });
+      await this.#zeichneListe();
+      this.#melde('Verworfen.', 'neutral');
+    } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }
 
   #karte(kontakt: Kontakt): HTMLElement {

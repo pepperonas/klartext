@@ -606,6 +606,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .abgesetzt { margin-top: var(--kt-raum-4); }
 
 .aufgabenkarte { border-left: 3px solid var(--kt-akzent); }
+
+/* Eine Vorstellung ist eine Neuigkeit, keine Warnung — Akzent, nicht Orange. */
+.vorstellung { border-left: 3px solid var(--kt-akzent); }
+
+/* Die Zahl an einem Navigationsziel: „hier wartet etwas". */
+.nav-zaehler {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: var(--kt-raum-2);
+  padding: 0 6px;
+  border-radius: var(--kt-r-voll);
+  background: var(--kt-akzent);
+  color: var(--kt-auf-akzent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .aufgabe {
   display: flex;
   align-items: center;

@@ -323,6 +323,7 @@ npm run reproduzierbar  # zweimal bauen, Byte für Byte vergleichen
 npm run kopfzeilen   # Kopfzeilen der LAUFENDEN Seite (nach jedem Deploy)
 npm run erster-nutzen   # verschlüsseln ohne eigenen Schlüssel, gegen echtes gpg
 npm run bilder       # die Bilder der README aus der gebauten App erzeugen
+SCHRITTE=1 npm run relay   # Zustellung mit Fortschrittsanzeige (bei zwei Browsern Gold wert)
 npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 ```
 
@@ -360,6 +361,9 @@ npm run fixtures     # GPG-Testvektoren neu erzeugen (braucht gpg)
 | `verlauf.test.ts` | Der lokale Verlauf: Ciphertext auf der Platte, Reihenfolge, und dass ein kaputter Eintrag den Rest nicht mitnimmt. |
 | `schritte.test.ts` | Die Fortschrittsanzeige — vor allem ihre ARIA-Zusagen, denn die SIND für manche die Anzeige. |
 | `doku.test.ts` | Die README gegen das Repo: Badge-Zahlen, Bilder, Verweise, Befehle. |
+| `vorstellung.test.ts` | Das Format der Vorstellung — Fingerprint aus dem Schlüssel gerechnet, privater Schlüssel abgewiesen. |
+| `waechter.test.ts` | Der Postfachwächter: nur entsperrt, nur einer, richtet ein, holt Vorgemerktes nach. |
+| `sicherung.test.ts` | Die Vollsicherung: verschlüsselt, ergänzt statt zu ersetzen. |
 | `build-kennung.test.ts` | Die Kennung kommt vom Server — also geprüfte Form oder gar nichts. |
 | `datei-ziel.test.ts` | Der Weg auf die Platte, vor allem: jeder Fehlweg endet im Blob-Rückfall. |
 
@@ -452,6 +456,56 @@ entschlüsselt und neu verschlüsselt.
 ⚠️ Sie steht bewusst in den Einstellungen und nicht neben der
 Schlüsselsicherung — sonst hält jemand seine Gespräche für gesichert, weil er
 „eine Sicherung" hat.
+
+## Eine ankommende Nachricht gehört dem ABSENDER
+
+⚠️ **Der schwerste Fehler dieser Sitzung.** `holeNeues(eigener, kontaktFingerprint)`
+schrieb jede abgeholte Nachricht dem Gespräch zu, das gerade **offen** war. Das
+Postfach gehört einem selbst, und jeder darf hineinschreiben — sobald man mit
+zwei Leuten schrieb, landete Bobs Nachricht bei Carol. Nichts stürzte dabei ab.
+
+Wer der Absender ist, steht in der **Signatur**; dafür muss entschlüsselt
+werden, also entscheidet das der Worker (`vault.nimmAn`). Nur eine **gültige**
+Signatur ordnet zu — „Unterzeichner unbekannt" heisst gerade, dass man es nicht
+weiss, dann wird auch nicht geraten. Was sich nicht zuordnen lässt, kommt unter
+`UNBEKANNTER_ABSENDER`: nicht weggeworfen (eine verlorene Nachricht ist
+schlimmer als eine unsortierte) und nicht irgendwo einsortiert (eine falsch
+einsortierte ist am schlimmsten).
+
+Dass `kontaktFingerprint` als Parameter überflüssig wurde, ist der Beweis, dass
+der Fehler weg ist — der Compiler hat ihn als ungenutzt gemeldet.
+
+## „Hat deine Einladung angenommen" — der Weg dorthin
+
+Drei Dinge mussten zusammenkommen, und jedes einzelne fehlte:
+
+1. **Ein Rückweg.** Wer eine Einladung annimmt, legt seinen eigenen Schlüssel
+   als *Vorstellung* in das Postfach des Einladenden. Dessen Kennung lässt sich
+   aus dem Fingerprint rechnen — es braucht keinen Rückkanal.
+2. **Jemanden, der abholt.** Das Abholen lag allein in der Gesprächsansicht.
+   Wer noch keinen Kontakt hat, öffnet nie ein Gespräch — und hätte es nie
+   erfahren. Dafür gibt es jetzt den `Postfachwaechter`, der läuft, solange der
+   Bund offen ist. ⚠️ Er richtet das Postfach auch gleich ein: das geschah
+   vorher ebenfalls erst beim Öffnen eines Gesprächs.
+3. **Einen Zeitpunkt, zu dem signiert werden kann.** Der Einladungslink lädt
+   die Seite neu — danach ist der Bund **gesperrt**, und eine Vorstellung muss
+   unterschrieben werden. Sie wird deshalb vorgemerkt
+   (`settings.offeneVorstellungen`) und geht beim nächsten Entsperren raus.
+
+⚠️ Sie wird **nie stillschweigend zum Kontakt**. Jeder mit deinem öffentlichen
+Schlüssel darf dir schreiben; würde ein eingehender Schlüssel ungefragt
+eingetragen, könnte jeder eine Kontaktliste mit frei gewählten Namen befüllen —
+und der Fingerprint-Abgleich wäre genau dort ausgehebelt, wo er zählt. Sie
+landet in einem **eigenen Speicher** (`STORE_INTROS`, Schema v4), nicht bei den
+Kontakten: dort würde sie sofort zum Prüfen von Signaturen herangezogen.
+
+⚠️ `oeffentlicheZu` sucht nur in den **eigenen** Schlüsseln. An einen Kontakt
+verschlüsselt man über `anArmored` mit dessen Schlüssel — mit `anFingerprints`
+scheitert es an `KEY_NOT_FOUND`, und weil der Aufrufer den Fehlschlag nur als
+„nicht zugestellt" verbuchte, blieb die Vorstellung stumm liegen.
+
+Live geprüft: Alice sieht die Vorstellung **2 s** nachdem Bob entsperrt, ohne
+selbst etwas zu tun (`npm run relay`, 14 Kriterien).
 
 ## Eine Einladung geht nur in EINE Richtung
 

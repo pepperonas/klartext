@@ -5,12 +5,24 @@
  */
 
 export const DB_NAME = 'klartext';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export const STORE_KEYS = 'keys';
 export const STORE_SETTINGS = 'settings';
 export const STORE_CONTACTS = 'contacts';
 export const STORE_MESSAGES = 'messages';
+/**
+ * Vorstellungen: Schlüssel, die jemand geschickt hat, den man noch nicht
+ * aufgenommen hat.
+ *
+ * ⚠️ Ein EIGENER Speicher, ausdrücklich nicht `contacts`. Läge ein
+ *    unbestätigter Schlüssel bei den Kontakten, würde er sofort zum Prüfen von
+ *    Signaturen herangezogen (`pruefSchluessel` nimmt alle Kontakte) — die App
+ *    meldete dann „Signatur gültig" von jemandem, den man nie aufgenommen hat.
+ *    Das Postfach steht jedem offen, der den öffentlichen Schlüssel hat; ein
+ *    Fremder könnte sich so selbst Vertrauen verschaffen.
+ */
+export const STORE_INTROS = 'introductions';
 
 function warte<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -46,6 +58,8 @@ export function oeffne(): Promise<IDBDatabase> {
           // Nach Gesprächspartner und Zeit — so wird die Ansicht gelesen.
           nachrichten.createIndex('kontakt', ['kontaktFp', 'zeit']);
         }
+        case 3:
+          db.createObjectStore(STORE_INTROS, { keyPath: 'fingerprint' });
       }
       /* eslint-enable no-fallthrough */
     };

@@ -10,7 +10,7 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DB_NAME, DB_VERSION, STORE_CONTACTS, STORE_KEYS, STORE_MESSAGES, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
+import { DB_NAME, DB_VERSION, STORE_CONTACTS, STORE_INTROS, STORE_KEYS, STORE_MESSAGES, STORE_SETTINGS, alle, lies, loesche, oeffne, schreibe } from '../src/worker/idb.ts';
 
 let db: IDBDatabase | null = null;
 
@@ -30,7 +30,7 @@ afterEach(() => { db?.close(); db = null; });
 describe('Anlegen', () => {
   it('legt alle Stores an', () => {
     expect([...(db?.objectStoreNames ?? [])].sort())
-      .toEqual([STORE_KEYS, STORE_SETTINGS, STORE_CONTACTS, STORE_MESSAGES].sort());
+      .toEqual([STORE_KEYS, STORE_SETTINGS, STORE_CONTACTS, STORE_MESSAGES, STORE_INTROS].sort());
   });
 
   it('führt die erwartete Version', () => {
@@ -137,6 +137,7 @@ describe('Migration', () => {
     // switch ist genau dafür da.
     expect([...db.objectStoreNames]).toContain(STORE_CONTACTS);
     expect([...db.objectStoreNames]).toContain(STORE_MESSAGES);
+    expect([...db.objectStoreNames]).toContain(STORE_INTROS);
     const zeile = await lies<{ label: string }>(db, STORE_KEYS, 'ALT');
     expect(zeile?.label).toBe('Bestandsschlüssel');
   });

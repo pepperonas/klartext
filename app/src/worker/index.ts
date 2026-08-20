@@ -79,6 +79,16 @@ async function fuehreAus(anfrage: AnyRequest): Promise<unknown> {
       return await vault.loesche(anfrage.fingerprint);
     case 'keys.setDefault':
       return await vault.setzeStandard(anfrage.fingerprint);
+    case 'verlauf.nimmAn':
+      return await vault.nimmAn(anfrage.relayId, anfrage.blob, anfrage.zeit);
+    case 'vorstellungen.liste':
+      return await vault.vorstellungenListe();
+    case 'vorstellungen.nimmAuf':
+      return await vault.vorstellungAufnehmen(anfrage.fingerprint);
+    case 'vorstellungen.verwirf':
+      return await vault.vorstellungVerwerfen(anfrage.fingerprint);
+    case 'vorstellungen.baue':
+      return await vault.vorstellungBauen(anfrage.fingerprint);
     case 'sicherung.erzeuge':
       return await vault.sicherungErzeuge(anfrage.fingerprint);
     case 'sicherung.spieleEin':

@@ -181,6 +181,14 @@ const [herunterladen] = await Promise.all([
 ]);
 const zertifikat = readFileSync(await herunterladen.path(), 'utf8');
 
+// ⚠️ Nach dem Widerrufszertifikat vermerkt der Vault das — und die
+//    Aufgabenliste zeichnet sich neu. Ein Klick auf den nächsten Knopf
+//    unmittelbar danach trifft ein Element, das gerade ersetzt wird
+//    („element was detached from the DOM"). Also erst warten, bis die
+//    erledigte Aufgabe verschwunden ist.
+await seite.waitForFunction(
+  () => !(document.querySelector('.aufgabenkarte')?.textContent ?? '').includes('Widerrufszertifikat anlegen'),
+  undefined, { timeout: 20_000 });
 await seite.click('.aufgabenkarte button:has-text("Sicherung erzeugen")');
 await seite.waitForSelector('#export-pw', { timeout: 20_000 });
 await seite.fill('#export-pw', MARKER.exportPassphrase);

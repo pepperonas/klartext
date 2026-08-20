@@ -18,10 +18,12 @@ import { KlartextError } from '../crypto/errors.ts';
 import type {
   KeyAlgorithm,
   KeyInfo,
+  Kontakt,
   LockReason,
   UserId,
   VaultSettings,
   VaultStatus,
+  Vorstellung,
 } from '../crypto/protocol.ts';
 import { STANDARD_EINSTELLUNGEN } from '../crypto/protocol.ts';
 
@@ -33,12 +35,22 @@ import { STANDARD_EINSTELLUNGEN } from '../crypto/protocol.ts';
  *    sie als fremde Eingabe — auch wenn der Nutzer selbst sie tippt.
  */
 const MAX_LABEL = 120;
+import { alsWoerter } from '../contacts/wortabgleich.ts';
 import { AutoLock } from './autolock.ts';
 import { Kontaktbuch } from './kontakte.ts';
 import { Verlauf } from './verlauf.ts';
 import * as idb from './idb.ts';
 import * as sicherung from './sicherung.ts';
-import { signiere as signiereText } from './werkzeug.ts';
+import * as vorstellungen from './vorstellung.ts';
+
+/**
+ * Wohin eine Nachricht kommt, deren Absender sich nicht bestimmen lässt.
+ *
+ * Kein gültiger Fingerprint, also kollidiert sie mit keinem Gespräch — und
+ * sie ist auffindbar, statt verloren zu sein.
+ */
+export const UNBEKANNTER_ABSENDER = 'UNBEKANNT';
+import { entschluessele, signiere as signiereText } from './werkzeug.ts';
 import {
   beschreibeSchluessel,
   erzeugeSchluessel,
@@ -449,6 +461,103 @@ export class Vault {
     });
     this.#beiAenderung();
     return await this.liste();
+  }
+
+  // ------------------------------------------------- Annahme und Vorstellung
+
+  /**
+   * Nimmt eine abgeholte Nachricht an und ordnet sie dem ABSENDER zu.
+   *
+   * ⚠️ Die Zuordnung kommt aus der Signatur, nicht aus dem Bildschirmzustand.
+   *    Vorher schrieb der Client jede ankommende Nachricht dem gerade offenen
+   *    Gespräch zu — bei zwei Kontakten landete Bobs Nachricht bei Carol.
+   *
+   * ⚠️ Wer nicht zuzuordnen ist, wird NICHT weggeworfen und auch nicht
+   *    irgendwo einsortiert: eine verlorene Nachricht ist schlimmer als eine
+   *    unsortierte, und eine falsch einsortierte ist am schlimmsten.
+   */
+  async nimmAn(relayId: string, blob: string, zeit: number): Promise<{
+    art: 'nachricht' | 'vorstellung' | 'unbekannt';
+    kontaktFp: string | null;
+  }> {
+    this.#fordereEntsperrt();
+    const id = `r:${relayId}`;
+    if (await this.verlauf.kennt(id)) {
+      return { art: 'nachricht', kontaktFp: null };
+    }
+
+    let klartext: string | null;
+    let unterzeichner: string | null = null;
+    try {
+      const ergebnis = await entschluessele(blob, [...this.#entsperrt.values()], await this.pruefSchluessel([]));
+      klartext = ergebnis.klartext;
+      // Nur eine GÜLTIGE Signatur ordnet zu. „Unterzeichner unbekannt" heisst
+      // gerade, dass wir es nicht wissen — dann raten wir auch nicht.
+      unterzeichner = ergebnis.signaturen.find((s) => s.zustand === 'gueltig')?.fingerprint ?? null;
+    } catch {
+      // Nicht für uns oder kaputt: als unbekannt ablegen, damit sie nicht
+      // stillschweigend verschwindet.
+      klartext = null;
+    }
+
+    if (klartext !== null) {
+      const vorstellung = await vorstellungen.lese(klartext, unterzeichner).catch(() => null);
+      if (vorstellung !== null) {
+        // ⚠️ Eine Vorstellung von jemandem, den man schon hat, ist keine Neuigkeit.
+        const schon = await idb.lies(this.#datenbank, idb.STORE_CONTACTS, vorstellung.fingerprint);
+        if (schon === undefined) {
+          await idb.schreibe(this.#datenbank, idb.STORE_INTROS, vorstellung);
+        }
+        this.#beiAenderung();
+        return { art: 'vorstellung', kontaktFp: vorstellung.fingerprint };
+      }
+    }
+
+    const kontaktFp = unterzeichner === null ? UNBEKANNTER_ABSENDER : normalisiereFingerprint(unterzeichner);
+    await this.verlauf.lege({
+      id, kontaktFp, richtung: 'ein', ciphertext: blob, zeit, zugestellt: true,
+    });
+    this.#beiAenderung();
+    return { art: unterzeichner === null ? 'unbekannt' : 'nachricht', kontaktFp };
+  }
+
+  async vorstellungenListe(): Promise<Vorstellung[]> {
+    const zeilen = await idb.alle<vorstellungen.GespeicherteVorstellung>(
+      this.#datenbank, idb.STORE_INTROS);
+    return zeilen.map((z) => ({
+      fingerprint: z.fingerprint,
+      name: z.name,
+      angekommenAm: z.angekommenAm,
+      selbstSigniert: z.selbstSigniert,
+      woerter: alsWoerter(z.fingerprint),
+    }));
+  }
+
+  /** Aus einer Vorstellung wird ein Kontakt — unverifiziert, wie jeder neue. */
+  async vorstellungAufnehmen(fingerprint: string): Promise<Kontakt[]> {
+    const normal = normalisiereFingerprint(fingerprint);
+    const zeile = await idb.lies<vorstellungen.GespeicherteVorstellung>(
+      this.#datenbank, idb.STORE_INTROS, normal);
+    if (zeile === undefined) throw new KlartextError('KEY_NOT_FOUND');
+    await this.kontakte.uebernimm(zeile.armoredPublic, null, zeile.name);
+    await idb.loesche(this.#datenbank, idb.STORE_INTROS, normal);
+    this.#beiAenderung();
+    return await this.kontakte.liste();
+  }
+
+  async vorstellungVerwerfen(fingerprint: string): Promise<Vorstellung[]> {
+    await idb.loesche(this.#datenbank, idb.STORE_INTROS, normalisiereFingerprint(fingerprint));
+    this.#beiAenderung();
+    return await this.vorstellungenListe();
+  }
+
+  /** Die eigene Vorstellung als Nutzlast — der Client verschlüsselt sie. */
+  async vorstellungBauen(fingerprint: string): Promise<{ nutzlast: string }> {
+    const normal = normalisiereFingerprint(fingerprint);
+    const zeilen = await this.#alleGespeicherten();
+    const zeile = zeilen.find((z) => z.fingerprint === normal);
+    if (zeile === undefined) throw new KlartextError('KEY_NOT_FOUND');
+    return { nutzlast: vorstellungen.baueNutzlast(zeile.label, zeile.armoredPublic) };
   }
 
   /** Vollsicherung erzeugen — siehe worker/sicherung.ts. */

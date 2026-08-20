@@ -140,14 +140,29 @@ export class SchluesselAnsicht {
       error: 'Der Schlüsselbund wurde nach einem Fehler gesperrt.',
     };
 
+    // ⚠️ Eigenes Meldungsfeld INNERHALB der Karte. Vorher lief die Meldung
+    //    über `#meldungsfeld()` am Ende der Ansicht — also hinter allen
+    //    Schlüsselkarten, mehrere hundert Pixel unter dem Feld, in das man
+    //    gerade getippt hat. Wer sich vertippt, sucht die Antwort dort, wo er
+    //    hingesehen hat.
+    const fehlerZeile = el('p', { class: 'meldung', role: 'alert', 'aria-live': 'assertive' });
+
     const form = el('form', { class: 'form', novalidate: true },
       pw.wurzel,
-      el('button', { class: 'knopf haupt', type: 'submit', text: 'Entsperren' }));
+      el('button', { class: 'knopf haupt', type: 'submit', text: 'Entsperren' }),
+      fehlerZeile);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       void (async () => {
+        fehlerZeile.textContent = '';
         try { await this.#client.entsperre(pw.wert); }
-        catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
+        catch (fehler) {
+          fehlerZeile.textContent = fehlertext(fehler);
+          fehlerZeile.dataset['art'] = 'gefahr';
+          // Der Fokus zurück ins Feld: der nächste Versuch beginnt dort.
+          pw.eingabe.focus();
+          pw.eingabe.select();
+        }
       })();
     });
 
@@ -372,6 +387,11 @@ export class SchluesselAnsicht {
         fingerprint: schluessel.fingerprint,
       });
       lade(`klartext-widerruf-${schluessel.fingerprint.slice(-16)}.asc`, armored);
+      // ⚠️ Neu zeichnen: der Vault vermerkt jetzt, dass ein Zertifikat
+      //    ausgegeben wurde — die Aufgabe „Widerrufszertifikat anlegen" ist
+      //    damit erledigt und muss verschwinden. Ohne das blieb sie stehen und
+      //    forderte etwas, das gerade getan wurde.
+      await this.zeichne(this.#letzterStatus);
       this.#melde('Widerrufszertifikat als Datei. Lege es getrennt vom Schlüssel ab.', 'gut');
     } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }

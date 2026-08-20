@@ -27,6 +27,7 @@ const EINTRAEGE: readonly Eintrag[] = [
 export class Navigation {
   readonly wurzel: HTMLElement;
   readonly #knoepfe = new Map<string, HTMLElement>();
+  #zaehler: HTMLElement | null = null;
 
   constructor(beiWechsel: (weg: Weg) => void) {
     const kinder = EINTRAEGE.map((e) => {
@@ -47,6 +48,32 @@ export class Navigation {
     });
 
     this.wurzel = el('nav', { class: 'nav', 'aria-label': 'Bereiche' }, ...kinder);
+  }
+
+  /**
+   * Zeigt an, dass bei „Kontakte" etwas wartet.
+   *
+   * ⚠️ Die Zahl steht am Ziel, nicht in einer flüchtigen Meldung. Wer gerade
+   *    woanders ist, soll es sehen — und es soll noch da sein, wenn er
+   *    hinschaut. Eine Meldung, die nach drei Sekunden verschwindet, hätte den
+   *    gemeldeten Fall („ich sehe nicht, dass jemand angenommen hat") nicht
+   *    gelöst, sondern nur verkürzt.
+   */
+  zeigeWartende(anzahl: number): void {
+    const knopf = this.#knoepfe.get('kontakte');
+    if (knopf === undefined) return;
+    const vorhanden = this.#zaehler;
+    if (anzahl <= 0) {
+      if (vorhanden !== null) { knopf.removeChild(vorhanden); this.#zaehler = null; }
+      knopf.removeAttribute('aria-description');
+      return;
+    }
+    const marke = vorhanden ?? el('span', { class: 'nav-zaehler' });
+    marke.textContent = String(anzahl);
+    if (vorhanden === null) { knopf.appendChild(marke); this.#zaehler = marke; }
+    // Für Hilfsmittel gehört die Bedeutung dazu, nicht nur die Ziffer.
+    knopf.setAttribute('aria-description',
+      anzahl === 1 ? 'ein neuer Schlüssel wartet' : `${String(anzahl)} neue Schlüssel warten`);
   }
 
   markiere(weg: Weg): void {

@@ -18,6 +18,7 @@ import {
   STANDARD_GUELTIG_TAGE,
   type Einladung,
 } from '../../contacts/einladung.ts';
+import type { Postfach } from '../../relay/postfach.ts';
 import { kopierKnopf } from '../components/kopieren.ts';
 import { qrAnzeige } from '../components/qr-anzeige.ts';
 import { el, ersetze } from '../dom.ts';
@@ -35,6 +36,8 @@ function knopfMit(text: string, beiKlick: () => void, klasse = ''): HTMLButtonEl
 
 export interface EinladungOptionen {
   readonly client: CryptoClient;
+  /** Für die Vorstellung an den frisch aufgenommenen Kontakt. */
+  readonly postfach: Postfach;
   readonly beiKontakte: () => void;
   readonly beiSchluessel: () => void;
   /** Zur eigenen Einladung — nötig, damit die Aufnahme gegenseitig wird. */
@@ -249,21 +252,66 @@ export class EinladungAnsicht {
    * aussieht — und die andere Seite wartet vergebens auf eine Antwort, die
    * technisch gar nicht ankommen kann.
    */
-  #zeigeGegeneinladung(name: string): void {
+  /**
+   * Schickt die eigene Vorstellung an den frisch aufgenommenen Kontakt.
+   *
+   * Gibt zurück, ob es geklappt hat. Es KANN nicht klappen, wenn Modus B bei
+   * einem von beiden aus ist — das ist kein Fehler, sondern die Voreinstellung.
+   */
+  async #stelleDichVor(anFingerprint: string): Promise<'gesendet' | 'vorgemerkt' | 'geht-nicht'> {
+    const einstellungen = this.#client.einstellungen;
+    if (!einstellungen.relayAktiv) return 'geht-nicht';
+
+    try {
+      const eigene = await this.#client.ruf('keys.list', {});
+      const eigener = eigene.find((k) => k.isDefault) ?? eigene[0];
+      if (eigener !== undefined && this.#client.status.state === 'unlocked') {
+        const ergebnis = await this.#optionen.postfach.stelleDichVor(eigener.fingerprint, anFingerprint);
+        if (ergebnis.ok) return 'gesendet';
+      }
+    } catch { /* fällt unten auf das Vormerken zurück */ }
+
+    // ⚠️ Der Normalfall, nicht die Ausnahme: der Einladungslink lädt die Seite
+    //    neu, danach ist der Schlüsselbund gesperrt — und eine Vorstellung
+    //    muss signiert werden. Also vormerken; der Postfachwächter schickt sie
+    //    beim nächsten Entsperren.
+    const offen = einstellungen.offeneVorstellungen;
+    if (!offen.includes(anFingerprint)) {
+      await this.#client.setzeEinstellungen({ offeneVorstellungen: [...offen, anFingerprint] });
+    }
+    return 'vorgemerkt';
+  }
+
+  #zeigeGegeneinladung(name: string, zurueck: 'gesendet' | 'vorgemerkt' | 'geht-nicht'): void {
+    const erledigt = zurueck !== 'geht-nicht';
+    const texte: Readonly<Record<typeof zurueck, string>> = {
+      gesendet:
+        `${name} sieht dich demnächst in den eigenen Kontakten und muss dich dort nur noch `
+        + 'bestätigen. Ihr könnt euch dann gegenseitig schreiben.',
+      vorgemerkt:
+        `Dein Schlüssel geht an ${name}, sobald du den Schlüsselbund das nächste Mal `
+        + 'entsperrst — unterschreiben lässt sich nur mit ihm. Du musst dafür nichts tun.',
+      'geht-nicht':
+        `Du kannst ${name} ab sofort schreiben. Umgekehrt geht es noch nicht: ${name} hat `
+        + 'deinen öffentlichen Schlüssel nicht — eine Einladung trägt immer nur den des '
+        + 'Absenders. Ohne Zustellserver musst du ihn selbst zurückschicken.',
+    };
+
     ersetze(this.wurzel,
       el('h2', { class: 'ansicht-titel', text: `${name} ist jetzt in deinen Kontakten` }),
       el('section', { class: 'karte' },
-        el('p', {
-          text:
-            `Du kannst ${name} ab sofort schreiben. Umgekehrt geht es noch nicht: `
-            + `${name} hat deinen öffentlichen Schlüssel nicht — eine Einladung trägt immer nur `
-            + 'den des Absenders.',
-        }),
-        el('p', { class: 'hinweis', text:
+        erledigt
+          ? el('p', {},
+              el('strong', { text: 'Und dein Schlüssel ist unterwegs. ' }),
+              document.createTextNode(texte[zurueck]))
+          : el('p', { text: texte[zurueck] }),
+        erledigt ? null : el('p', { class: 'hinweis', text:
           'Schick deine eigene Einladung zurück, dann seht ihr euch gegenseitig.' }),
         el('div', { class: 'knopfreihe' },
-          knopfMit('Eigene Einladung erzeugen', () => { this.#optionen.beiEinladen(); }, 'haupt'),
-          knopfMit('Später', () => { this.#optionen.beiKontakte(); }))),
+          erledigt
+            ? knopfMit('Zu den Kontakten', () => { this.#optionen.beiKontakte(); }, 'haupt')
+            : knopfMit('Eigene Einladung erzeugen', () => { this.#optionen.beiEinladen(); }, 'haupt'),
+          erledigt ? null : knopfMit('Später', () => { this.#optionen.beiKontakte(); }))),
       this.#meldung);
   }
 
@@ -272,10 +320,11 @@ export class EinladungAnsicht {
       const kontakt: Kontakt = await this.#client.ruf('kontakte.uebernimm', {
         armored: null, binaer: einladung.schluessel, name: einladung.name,
       });
-      void kontakt;
-      // Statt wortlos in die Liste zu springen: sagen, dass die Hälfte fehlt,
-      // und den Weg dorthin anbieten.
-      this.#zeigeGegeneinladung(einladung.name);
+      // Den eigenen Schlüssel gleich zurückschicken, damit die Aufnahme
+      // gegenseitig wird. Geht nur mit Modus B auf BEIDEN Seiten — schlägt es
+      // fehl, ist das kein Fehler, sondern der Normalfall ohne Zustellserver.
+      const zurueck = await this.#stelleDichVor(kontakt.fingerprint);
+      this.#zeigeGegeneinladung(einladung.name, zurueck);
     } catch (fehler) {
       this.#meldung.textContent = fehlertext(fehler);
       this.#meldung.dataset['art'] = 'gefahr';

@@ -89,6 +89,21 @@ export interface VaultSettings {
    *    (verschlüsselten) privaten Schlüssel. Das steht so im Threat-Model.
    */
   readonly relayTokens: Readonly<Record<string, string>>;
+
+  /**
+   * Fingerprints, denen man sich noch vorstellen will.
+   *
+   * ⚠️ Nötig, weil das Annehmen einer Einladung fast immer bei GESPERRTEM
+   *    Schlüsselbund geschieht: der Link lädt die Seite neu, und danach ist zu.
+   *    Die Vorstellung muss aber signiert werden, dafür braucht es den
+   *    privaten Schlüssel. Sie wird also vorgemerkt und verschickt, sobald
+   *    entsperrt wird — sonst käme sie nie an, und der Einladende sähe nie,
+   *    dass jemand angenommen hat.
+   *
+   * ⚠️ Enthält NUR Fingerprints, also nichts Geheimes. Sie stehen ohnehin in
+   *    den Kontakten.
+   */
+  readonly offeneVorstellungen: readonly string[];
 }
 
 export const STANDARD_EINSTELLUNGEN: VaultSettings = {
@@ -97,6 +112,7 @@ export const STANDARD_EINSTELLUNGEN: VaultSettings = {
   relayAktiv: false,
   relayUrl: '',
   relayTokens: {},
+  offeneVorstellungen: [],
 };
 
 /** Ergebnis einer Schluesselerzeugung. Der private Teil bleibt im Worker. */
@@ -242,6 +258,30 @@ export interface Ops {
 
   'verlauf.liste': { req: { kontaktFp: string }; res: readonly EntfaltetesGespraech[] };
   'verlauf.lege': { req: { eintrag: VerlaufsEintrag }; res: readonly EntfaltetesGespraech[] };
+
+  /**
+   * Nimmt eine abgeholte Nachricht an und ordnet sie dem ABSENDER zu.
+   *
+   * ⚠️ Vorher schrieb der Client sie dem Gespräch zu, das gerade offen war.
+   *    Das Postfach gehört einem selbst, jeder darf hineinschreiben — sobald
+   *    man mit mehr als einer Person schreibt, landete eine Nachricht von Bob
+   *    im Gespräch mit Carol. Wer sie geschickt hat, steht in der Signatur;
+   *    dafür muss sie entschlüsselt werden, also gehört das in den Worker.
+   */
+  'verlauf.nimmAn': {
+    req: { relayId: string; blob: string; zeit: number };
+    res: { art: 'nachricht' | 'vorstellung' | 'unbekannt'; kontaktFp: string | null };
+  };
+
+  /** Wartende Vorstellungen — Schlüssel, die noch niemand aufgenommen hat. */
+  'vorstellungen.liste': { req: Record<never, never>; res: readonly Vorstellung[] };
+  'vorstellungen.nimmAuf': { req: { fingerprint: string }; res: readonly Kontakt[] };
+  'vorstellungen.verwirf': { req: { fingerprint: string }; res: readonly Vorstellung[] };
+  /** Die eigene Vorstellung an jemanden schicken (nur der Bauteil dafür). */
+  'vorstellungen.baue': {
+    req: { fingerprint: string };
+    res: { nutzlast: string };
+  };
   'verlauf.loesche': { req: { kontaktFp: string }; res: readonly EntfaltetesGespraech[] };
   /** Wie viele ungelesene je Kontakt — für die Kontaktliste. */
   'verlauf.zaehler': { req: Record<never, never>; res: Readonly<Record<string, number>> };
@@ -344,6 +384,18 @@ export type Richtung = 'ein' | 'aus';
  *    Der Verlauf ist damit im Ruhezustand verschlüsselt, ohne dass irgendwo
  *    eigene Kryptografie dazukäme. Lesen setzt einen entsperrten Bund voraus.
  */
+/** Eine wartende Vorstellung, wie das UI sie sieht. */
+export interface Vorstellung {
+  readonly fingerprint: string;
+  /** Der ANGEGEBENE Name — nicht überprüfbar, deshalb sagt das UI es dazu. */
+  readonly name: string;
+  readonly angekommenAm: string;
+  /** Mit dem enthaltenen Schlüssel unterschrieben? Beweist Besitz, nicht wer. */
+  readonly selbstSigniert: boolean;
+  /** Wörter zum Vorlesen — wie beim Kontakt. */
+  readonly woerter: readonly string[];
+}
+
 export interface VerlaufsEintrag {
   readonly id: string;
   readonly kontaktFp: string;
