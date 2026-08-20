@@ -58,6 +58,7 @@ const einstellungen = new EinstellungenAnsicht({
 });
 
 const einladung = new EinladungAnsicht({
+  beiEinladen: () => { router.gehe({ ziel: 'einladen' }); },
   client,
   beiKontakte: () => { router.gehe({ ziel: 'kontakte' }); },
   beiSchluessel: () => { router.gehe({ ziel: 'schluessel' }); },

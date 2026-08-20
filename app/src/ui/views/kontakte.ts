@@ -131,7 +131,54 @@ export class KontakteAnsicht {
         knopfMit(verifiziert ? 'Erneut abgleichen' : 'Fingerprint abgleichen',
           () => { this.#zeigeVerifikation(kontakt); }),
         knopfMit('Schlüssel geben', () => { void this.#gibSchluessel(kontakt); }),
+        // ⚠️ `kontakte.umbenennen` lag seit Phase 3 fertig und getestet im
+        //    Worker — und keine Ansicht rief es auf. Eine gebaute Fähigkeit,
+        //    die niemand erreichen kann, ist keine Fähigkeit.
+        knopfMit('Umbenennen', () => { this.#zeigeUmbenennen(kontakt); }),
         knopfMit('Entfernen', () => { void this.#loesche(kontakt); })));
+  }
+
+  /**
+   * Der Name eines Kontakts ist ohnehin ÖRTLICH — er steht in deinem
+   * Adressbuch, nicht im Schlüssel. Deshalb braucht das hier keine Warnung
+   * wie beim eigenen Schlüssel: es ändert sich nichts, was jemand anderes
+   * sieht, und die Identität hängt am Fingerprint, nicht am Namen.
+   */
+  #zeigeUmbenennen(kontakt: Kontakt): void {
+    const feld = el('input', {
+      type: 'text', id: 'kontakt-neuer-name', value: kontakt.name, maxlength: '120',
+      'aria-label': 'Wie heisst die Person für dich?',
+    });
+    const form = el('form', { class: 'form', novalidate: true },
+      el('h3', { text: 'Kontakt umbenennen' }),
+      el('p', { class: 'hinweis', text:
+        'Der Name steht nur in deinem Adressbuch. Wiedererkannt wird die Person am Fingerprint — '
+        + 'der ändert sich dabei nicht.' }),
+      el('p', { class: 'fingerprint klein', text: gruppiert(kontakt.fingerprint) }),
+      el('div', { class: 'feld' },
+        el('label', { for: 'kontakt-neuer-name', text: 'Wie heisst die Person für dich?' }),
+        feld),
+      el('div', { class: 'knopfreihe eng' },
+        el('button', { class: 'knopf haupt', type: 'submit', text: 'Namen übernehmen' }),
+        knopfMit('Abbrechen', () => { void this.#zeichneListe(); })));
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void (async () => {
+        try {
+          await this.#client.ruf('kontakte.umbenennen', {
+            fingerprint: kontakt.fingerprint, name: feld.value,
+          });
+          await this.#zeichneListe();
+          this.#melde(`Heisst jetzt „${feld.value.trim()}" in deinem Adressbuch.`, 'gut');
+        } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
+      })();
+    });
+
+    ersetze(this.wurzel,
+      el('h2', { class: 'ansicht-titel', text: kontakt.name }),
+      el('section', { class: 'karte' }, form),
+      this.#meldung);
   }
 
   // ------------------------------------------------------------ Verifikation

@@ -183,6 +183,11 @@ async function nimmEinladungAn(seite, url) {
   await seite.goto(`${basis}/e${fragment}`, { waitUntil: 'domcontentloaded' });
   await seite.waitForSelector('.woerter', { timeout: 20_000 });
   await seite.click('button:has-text("Kontakt aufnehmen")');
+  // ⚠️ Danach kommt nicht mehr die Liste, sondern der Hinweis auf die
+  //    Gegeneinladung: eine Einladung trägt nur den Schlüssel des Absenders,
+  //    die Aufnahme ist also einseitig. Hier wird sie weggeklickt — die
+  //    Gegenrichtung stellt dieser Lauf ohnehin selbst her.
+  await seite.click('button:has-text("Später")');
   await seite.waitForSelector('.kontakt', { timeout: 20_000 });
 }
 

@@ -24,10 +24,20 @@ import type {
   VaultStatus,
 } from '../crypto/protocol.ts';
 import { STANDARD_EINSTELLUNGEN } from '../crypto/protocol.ts';
+
+/**
+ * Obergrenze für eine Beschriftung.
+ *
+ * ⚠️ Nicht Zierde: die Beschriftung wird angezeigt, und ein 10-kB-„Name"
+ *    zerlegt jede Liste. Sie kommt aus dem Eingabefeld des Nutzers, also gilt
+ *    sie als fremde Eingabe — auch wenn der Nutzer selbst sie tippt.
+ */
+const MAX_LABEL = 120;
 import { AutoLock } from './autolock.ts';
 import { Kontaktbuch } from './kontakte.ts';
 import { Verlauf } from './verlauf.ts';
 import * as idb from './idb.ts';
+import * as sicherung from './sicherung.ts';
 import { signiere as signiereText } from './werkzeug.ts';
 import {
   beschreibeSchluessel,
@@ -417,6 +427,53 @@ export class Vault {
     }
     this.#beiAenderung();
     return await this.liste();
+  }
+
+  /**
+   * Setzt die örtliche Beschriftung. Der Schlüssel bleibt unangetastet.
+   *
+   * Eine leere Eingabe stellt die User-ID wieder her, statt eine namenlose
+   * Zeile zu hinterlassen — „" ist keine Beschriftung, sondern ein Loch.
+   */
+  async beschrifte(fingerprint: string, label: string): Promise<KeyInfo[]> {
+    const normal = normalisiereFingerprint(fingerprint);
+    const zeilen = await this.#alleGespeicherten();
+    const zeile = zeilen.find((z) => z.fingerprint === normal);
+    if (zeile === undefined) throw new KlartextError('KEY_NOT_FOUND');
+
+    const sauber = label.trim().slice(0, MAX_LABEL);
+    const oeffentlich = await leseOeffentlich(zeile.armoredPublic);
+    await this.#speichere({
+      ...zeile,
+      label: sauber.length > 0 ? sauber : (oeffentlich.getUserIDs()[0] ?? normal),
+    });
+    this.#beiAenderung();
+    return await this.liste();
+  }
+
+  /** Vollsicherung erzeugen — siehe worker/sicherung.ts. */
+  async sicherungErzeuge(fingerprint: string): Promise<{
+    armored: string; filename: string; kontakte: number; nachrichten: number;
+  }> {
+    const normal = normalisiereFingerprint(fingerprint);
+    const privat = this.#privaterSchluessel(normal);
+    const armored = await sicherung.erzeuge(this.#datenbank, privat.toPublic(), privat);
+    return {
+      armored,
+      filename: `klartext-sicherung-${normal.slice(-16)}.asc`,
+      kontakte: (await idb.alle(this.#datenbank, idb.STORE_CONTACTS)).length,
+      nachrichten: (await idb.alle(this.#datenbank, idb.STORE_MESSAGES)).length,
+    };
+  }
+
+  /** Vollsicherung einspielen — ergänzend, nie ersetzend. */
+  async sicherungSpieleEin(armored: string): Promise<sicherung.Einspielbericht> {
+    this.#fordereEntsperrt();
+    // Alle entsperrten Schlüssel, nicht nur der Standard: eine Sicherung kann
+    // an einen älteren Schlüssel gerichtet sein, den es noch gibt.
+    const bericht = await sicherung.spieleEin(this.#datenbank, armored, [...this.#entsperrt.values()]);
+    this.#beiAenderung();
+    return bericht;
   }
 
   async #speichere(zeile: GespeicherterSchluessel): Promise<void> {

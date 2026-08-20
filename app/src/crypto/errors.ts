@@ -13,6 +13,7 @@ export type KlartextErrorCode =
   | 'KEY_NOT_FOUND'
   | 'KEY_EXISTS'
   | 'NOT_A_KEY'
+  | 'NOT_A_BACKUP'
   | 'NOT_A_SECRET_KEY'
   | 'NOT_A_MESSAGE'
   | 'NOT_A_SIGNATURE'
@@ -31,6 +32,7 @@ const MELDUNGEN: Readonly<Record<KlartextErrorCode, string>> = {
   KEY_NOT_FOUND: 'Diesen Schlüssel gibt es hier nicht.',
   KEY_EXISTS: 'Dieser Schlüssel liegt bereits im Schlüsselbund.',
   NOT_A_KEY: 'Das ist kein OpenPGP-Schlüssel.',
+  NOT_A_BACKUP: 'Das ist keine klartext-Sicherung — oder eine aus einer anderen Fassung.',
   NOT_A_SECRET_KEY: 'Das ist ein öffentlicher Schlüssel — hier wird ein privater gebraucht.',
   NOT_A_MESSAGE: 'Das ist keine OpenPGP-Nachricht.',
   NOT_A_SIGNATURE: 'Das ist keine OpenPGP-Signatur.',

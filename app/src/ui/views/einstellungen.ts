@@ -11,7 +11,7 @@ import type { CryptoClient } from '../../crypto/client.ts';
 import type { VaultSettings } from '../../crypto/protocol.ts';
 import { pruefeHerkunft, STANDARD_RELAY_PFAD } from '../../relay/client.ts';
 import { el, ersetze } from '../dom.ts';
-import { fehlertext } from './schluessel.ts';
+import { fehlertext, lade } from './schluessel.ts';
 
 function knopfMit(text: string, beiKlick: () => void, klasse = ''): HTMLButtonElement {
   const knopf = el('button', { class: `knopf ${klasse}`.trim(), type: 'button', text });
@@ -42,8 +42,87 @@ export class EinstellungenAnsicht {
       el('h2', { class: 'ansicht-titel', text: 'Einstellungen' }),
       this.#sperreKarte(e),
       this.#relayKarte(e),
+      this.#sicherungsKarte(),
       this.#meldung,
     );
+  }
+
+  #melde(text: string, art: string): void {
+    this.#meldung.textContent = text;
+    this.#meldung.dataset['art'] = art;
+  }
+
+  // --------------------------------------------------- Gespräche sichern
+
+  /**
+   * Vollsicherung von Kontakten und Verlauf.
+   *
+   * ⚠️ Steht bewusst NICHT neben der Schlüsselsicherung. Die ist ein
+   *    OpenPGP-Export, den GnuPG lesen kann; diese Datei ist etwas anderes und
+   *    darf nicht damit verwechselt werden. Der erste Satz sagt genau, was in
+   *    der Schlüsseldatei fehlt — sonst hält jemand seine Gespräche für
+   *    gesichert, weil er „eine Sicherung" hat.
+   */
+  #sicherungsKarte(): HTMLElement {
+    const einlesen = el('input', {
+      type: 'file', id: 'sicherung-datei', accept: '.asc,.txt',
+      'aria-label': 'Sicherungsdatei auswählen',
+    });
+    einlesen.addEventListener('change', () => {
+      const datei = einlesen.files?.[0];
+      if (datei !== undefined) void this.#spieleEin(datei);
+    });
+
+    return el('section', { class: 'karte' },
+      el('h3', { text: 'Gespräche und Kontakte sichern' }),
+      el('p', { class: 'hinweis' },
+        el('strong', { text: 'In der Schlüsselsicherung sind sie NICHT enthalten. ' }),
+        document.createTextNode(
+          'Die enthält nur den Schlüssel, damit GnuPG sie lesen kann. Werden die Browserdaten '
+          + 'gelöscht, bekommst du damit den Schlüssel zurück — aber kein Gespräch.')),
+      el('p', { class: 'hinweis', text:
+        'Diese Datei ist an deinen eigenen Schlüssel verschlüsselt. Ohne ihn und seine '
+        + 'Passphrase ist sie ein Haufen Zufall — du kannst sie also dorthin legen, wo du '
+        + 'auch die Schlüsselsicherung aufbewahrst.' }),
+      el('div', { class: 'knopfreihe' },
+        knopfMit('Sicherung erzeugen', () => { void this.#erzeugeSicherung(); }, 'haupt')),
+      el('details', { class: 'ausklapp' },
+        el('summary', { text: 'Sicherung einspielen' }),
+        el('p', { class: 'hinweis', text:
+          'Ergänzt, was fehlt — vorhandene Kontakte und Nachrichten bleiben, wie sie sind. '
+          + 'Eine alte Sicherung kann also nichts zurückdrehen.' }),
+        einlesen));
+  }
+
+  async #erzeugeSicherung(): Promise<void> {
+    try {
+      const schluessel = await this.#client.ruf('keys.list', {});
+      const eigener = schluessel.find((k) => k.isDefault) ?? schluessel[0];
+      if (eigener === undefined) {
+        this.#melde('Dafür brauchst du zuerst einen eigenen Schlüssel.', 'gefahr');
+        return;
+      }
+      const ergebnis = await this.#client.ruf('sicherung.erzeuge', { fingerprint: eigener.fingerprint });
+      lade(ergebnis.filename, ergebnis.armored);
+      this.#melde(
+        `Gesichert: ${String(ergebnis.kontakte)} Kontakte, ${String(ergebnis.nachrichten)} Nachrichten.`,
+        'gut');
+    } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
+  }
+
+  async #spieleEin(datei: File): Promise<void> {
+    try {
+      const b = await this.#client.ruf('sicherung.spieleEin', { armored: await datei.text() });
+      const uebersprungen = b.kontakteUebersprungen + b.nachrichtenUebersprungen;
+      this.#melde(
+        `Eingespielt: ${String(b.kontakteNeu)} Kontakte, ${String(b.nachrichtenNeu)} Nachrichten.`
+        + (uebersprungen > 0
+          // Stillschweigend zu überspringen sähe aus wie ein fehlgeschlagener
+          // Import — die Zahl gehört dazu.
+          ? ` ${String(uebersprungen)} waren schon da und blieben unverändert.`
+          : ''),
+        'gut');
+    } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
   }
 
   // -------------------------------------------------------------- Sperre

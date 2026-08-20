@@ -53,6 +53,18 @@ export class SchluesselAnsicht {
   readonly #client: CryptoClient;
   readonly #optionen: SchluesselOptionen;
   #meldung: HTMLElement | null = null;
+  /** Welcher Schlüssel gerade umbenannt wird — null heisst: keiner. */
+  #umbenennt: string | null = null;
+  /**
+   * Der zuletzt gezeichnete Zustand.
+   *
+   * ⚠️ Nötig, weil das Umbenennen die Ansicht neu zeichnen muss und der
+   *    Zustand nur als Argument hereinkommt. Ihn zu erraten (etwa immer
+   *    „unlocked") wäre falsch: die Sperre kann inzwischen zugefallen sein.
+   */
+  #letzterStatus: VaultStatus = {
+    state: 'empty', keyCount: 0, lockAt: null, lastLockReason: null,
+  };
 
   constructor(optionen: SchluesselOptionen) {
     this.#client = optionen.client;
@@ -60,6 +72,10 @@ export class SchluesselAnsicht {
   }
 
   async zeichne(status: VaultStatus): Promise<void> {
+    this.#letzterStatus = status;
+    // Ein Zustandswechsel bricht eine offene Umbenennung ab — bei zugefallener
+    // Sperre stünde sonst ein Formular da, das nichts mehr speichern kann.
+    if (status.state !== 'unlocked') this.#umbenennt = null;
     if (status.state === 'empty') { this.#zeichneLeer(); return; }
     const schluessel = await this.#client.ruf('keys.list', {});
     if (status.state === 'locked') { this.#zeichneGesperrt(status, schluessel); return; }
@@ -249,17 +265,42 @@ export class SchluesselAnsicht {
         schluessel.hasBackup ? '' : 'haupt',
       ));
       aktionen.appendChild(knopfMit('Widerrufszertifikat', () => { void this.#widerruf(schluessel); }));
+      aktionen.appendChild(knopfMit('Umbenennen', () => {
+        this.#umbenennt = schluessel.fingerprint;
+        void this.zeichne(this.#letzterStatus);
+      }));
     }
+
+    if (this.#umbenennt === schluessel.fingerprint) {
+      return karte(
+        el('div', { class: 'kopfzeile' }, el('h3', { text: schluessel.label })),
+        el('p', { class: 'fingerprint', text: gruppiere(schluessel.fingerprint) }),
+        this.#benenneUm(schluessel),
+      );
+    }
+
+    // ⚠️ Hier stand `userIds[0] ?? label` — die Beschriftung wurde also nie
+    //    angezeigt, solange es eine User-ID gab. Eine Umbenennung wäre
+    //    unsichtbar geblieben. Jetzt führt die Beschriftung (die beim Anlegen
+    //    auf die User-ID gesetzt wird), und die User-ID steht darunter, sobald
+    //    sie abweicht — man soll immer sehen, was ANDERE sehen.
+    const eigenerName = schluessel.label;
+    const userId = schluessel.userIds[0] ?? null;
 
     return karte(
       el('div', { class: 'kopfzeile' },
-        el('h3', { text: schluessel.userIds[0] ?? schluessel.label }),
+        el('h3', { text: eigenerName }),
         schluessel.isDefault ? el('span', { class: 'pille', text: 'Standard' }) : null,
         schluessel.isRevoked ? el('span', { class: 'pille gefahr', text: 'widerrufen' }) : null,
         gesperrt ? el('span', { class: 'pille', text: 'gesperrt' }) : null,
         schluessel.hasBackup
           ? el('span', { class: 'pille gut', text: 'gesichert' })
           : el('span', { class: 'pille warnung', text: 'nicht gesichert' })),
+      userId !== null && userId !== eigenerName
+        ? el('p', { class: 'hinweis' },
+            el('strong', { text: 'Andere sehen: ' }),
+            document.createTextNode(userId))
+        : null,
       el('p', { class: 'fingerprint', text: gruppiere(schluessel.fingerprint) }),
       el('p', {
         class: 'hinweis',
@@ -269,6 +310,50 @@ export class SchluesselAnsicht {
       }),
       aktionen,
     );
+  }
+
+  /**
+   * Umbenennen — nur die eigene Beschriftung.
+   *
+   * ⚠️ Der begleitende Satz ist der eigentliche Gehalt dieser Funktion. Wer
+   *    hier umbenennt und glaubt, damit ändere sich der Name im Schlüssel,
+   *    verlässt sich auf etwas, das nicht passiert ist: die User-ID steht
+   *    unveränderlich im öffentlichen Schlüssel und reist mit jeder Kopie mit.
+   */
+  #benenneUm(schluessel: KeyInfo): HTMLElement {
+    const feld = el('input', {
+      type: 'text', id: `name-${schluessel.fingerprint.slice(-8)}`,
+      value: schluessel.label, maxlength: '120',
+      'aria-label': 'Name in deinem Schlüsselbund',
+    });
+    const form = el('form', { class: 'form umbenennen', novalidate: true },
+      el('div', { class: 'feld' },
+        el('label', { for: feld.id, text: 'Name in deinem Schlüsselbund' }),
+        feld),
+      el('p', { class: 'hinweis' },
+        el('strong', { text: 'Nur für dich. ' }),
+        document.createTextNode(
+          'Der Name im Schlüssel selbst („' + (schluessel.userIds[0] ?? '—') + '") bleibt, wie er ist — ' +
+          'er steht unveränderlich im öffentlichen Schlüssel, und jede Kopie davon trägt ihn weiter. ' +
+          'Andere sehen also weiterhin den alten.')),
+      el('div', { class: 'knopfreihe eng' },
+        el('button', { class: 'knopf haupt', type: 'submit', text: 'Namen übernehmen' }),
+        knopfMit('Abbrechen', () => { void this.zeichne(this.#letzterStatus); })));
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void (async () => {
+        try {
+          await this.#client.ruf('keys.beschrifte', {
+            fingerprint: schluessel.fingerprint, label: feld.value,
+          });
+          this.#umbenennt = null;
+          await this.zeichne(this.#letzterStatus);
+          this.#melde('Name geändert — in deinem Schlüsselbund.', 'gut');
+        } catch (fehler) { this.#melde(fehlertext(fehler), 'gefahr'); }
+      })();
+    });
+    return form;
   }
 
   async #exportOeffentlich(schluessel: KeyInfo): Promise<void> {

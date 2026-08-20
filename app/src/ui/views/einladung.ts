@@ -37,6 +37,8 @@ export interface EinladungOptionen {
   readonly client: CryptoClient;
   readonly beiKontakte: () => void;
   readonly beiSchluessel: () => void;
+  /** Zur eigenen Einladung — nötig, damit die Aufnahme gegenseitig wird. */
+  readonly beiEinladen: () => void;
 }
 
 export class EinladungAnsicht {
@@ -98,6 +100,12 @@ export class EinladungAnsicht {
             'öffentlichen Schlüssel — der ist nicht geheim, du darfst ihn über jeden Kanal geben.',
         }),
         el('p', { class: 'hinweis', text: `Gültig ${restlaufzeit(einladung)}. Danach braucht es eine neue Einladung.` }),
+        // ⚠️ Damit niemand denkt, damit sei der Austausch erledigt.
+        el('p', { class: 'hinweis' },
+          el('strong', { text: 'Das ist die halbe Strecke. ' }),
+          document.createTextNode(
+            'Der Link trägt DEINEN Schlüssel. Die andere Person kann dir danach schreiben — '
+            + 'du ihr erst, wenn sie dir ihre eigene Einladung zurückschickt.')),
 
         passt
           ? el('div', { class: 'einladung-qr' },
@@ -218,7 +226,44 @@ export class EinladungAnsicht {
         el('p', {
           class: 'hinweis leise',
           text: 'Der Kontakt gilt danach als NICHT verifiziert, bis du den Fingerprint abgeglichen hast.',
-        })),
+        }),
+
+        // ⚠️ Eine Einladung trägt NUR den Schlüssel dessen, der sie schickt.
+        //    Wer sie annimmt, sieht den Absender — der Absender sieht ihn
+        //    deswegen aber nicht. Das ist die Bauart, und sie stand nirgends:
+        //    gemeldet als „der neue Kontakt sieht mich, aber ich sehe ihn
+        //    nicht". Es ist kein Fehler, aber ohne diesen Satz sieht es wie
+        //    einer aus.
+        el('p', { class: 'hinweis' },
+          el('strong', { text: 'Es geht nur in eine Richtung. ' }),
+          document.createTextNode(
+            `Diese Einladung trägt ${einladung.name}s Schlüssel — deinen nicht. Damit `
+            + `${einladung.name} auch dir schreiben kann, brauchst du eine eigene Einladung.`))),
+      this.#meldung);
+  }
+
+  /**
+   * Nach dem Aufnehmen: die Gegenrichtung anbieten.
+   *
+   * Ohne diesen Schritt endet der Ablauf in einer Liste, in der alles richtig
+   * aussieht — und die andere Seite wartet vergebens auf eine Antwort, die
+   * technisch gar nicht ankommen kann.
+   */
+  #zeigeGegeneinladung(name: string): void {
+    ersetze(this.wurzel,
+      el('h2', { class: 'ansicht-titel', text: `${name} ist jetzt in deinen Kontakten` }),
+      el('section', { class: 'karte' },
+        el('p', {
+          text:
+            `Du kannst ${name} ab sofort schreiben. Umgekehrt geht es noch nicht: `
+            + `${name} hat deinen öffentlichen Schlüssel nicht — eine Einladung trägt immer nur `
+            + 'den des Absenders.',
+        }),
+        el('p', { class: 'hinweis', text:
+          'Schick deine eigene Einladung zurück, dann seht ihr euch gegenseitig.' }),
+        el('div', { class: 'knopfreihe' },
+          knopfMit('Eigene Einladung erzeugen', () => { this.#optionen.beiEinladen(); }, 'haupt'),
+          knopfMit('Später', () => { this.#optionen.beiKontakte(); }))),
       this.#meldung);
   }
 
@@ -228,7 +273,9 @@ export class EinladungAnsicht {
         armored: null, binaer: einladung.schluessel, name: einladung.name,
       });
       void kontakt;
-      this.#optionen.beiKontakte();
+      // Statt wortlos in die Liste zu springen: sagen, dass die Hälfte fehlt,
+      // und den Weg dorthin anbieten.
+      this.#zeigeGegeneinladung(einladung.name);
     } catch (fehler) {
       this.#meldung.textContent = fehlertext(fehler);
       this.#meldung.dataset['art'] = 'gefahr';

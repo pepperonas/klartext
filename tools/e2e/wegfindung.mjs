@@ -209,6 +209,19 @@ l = await lage();
 pruefe('Q · Einladung empfangen', l, wegeHeraus(l));
 const einladungZeigtWoerter = (await seite.locator('.wort').count()) === 13;
 
+// Der Schirm nach dem Aufnehmen: er sagt, dass die Aufnahme einseitig ist, und
+// bietet die Gegenrichtung an. ⚠️ Ohne ihn sprang die App wortlos in die Liste
+// — der Absender wartete dann vergebens auf eine Antwort, die technisch nicht
+// ankommen konnte („der neue Kontakt sieht mich, aber ich sehe ihn nicht").
+await seite.click('button:has-text("Kontakt aufnehmen")');
+await seite.waitForSelector('button:has-text("Eigene Einladung erzeugen")', { timeout: 20_000 });
+l = await lage();
+pruefe('R · Nach dem Aufnehmen', l, wegeHeraus(l));
+const sagtEinseitig = /nur den des Absenders|nicht|Einladung/.test(
+  (await seite.locator('.karte').first().innerText()).replace(/\s+/g, ' '));
+await seite.click('button:has-text("Später")');
+await seite.waitForSelector('.kontakt', { timeout: 20_000 });
+
 // ⚠️ Nach dem `goto` ist der Schlüsselbund gesperrt — ein Neuladen verliert
 //    den entsperrten Zustand, und genau so soll es sein. Also wieder auf.
 await seite.click('.nav-eintrag:has-text("Schlüssel")');
@@ -236,6 +249,7 @@ const zusatz = [
   ['ein Neuladen sperrt den Schlüsselbund', gesperrtNachNeuladen],
   ['die Einladung trägt die Nutzlast im Fragment', einladungsUrl.includes('/e#') && !einladungsUrl.includes('?')],
   ['die empfangene Einladung zeigt dreizehn Abgleich-Wörter', einladungZeigtWoerter],
+  ['nach dem Aufnehmen wird die Gegeneinladung angeboten', sagtEinseitig],
   ['Werkzeug bietet bei Klartext das Verschlüsseln an', bietetVerschluesseln],
   ['Werkzeug bietet bei einer Nachricht das Entschlüsseln an', bietetEntschluesseln],
   ['„Sperren" fehlt im leeren Schlüsselbund', !sperrenImLeeren],

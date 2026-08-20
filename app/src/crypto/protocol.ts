@@ -137,6 +137,36 @@ export interface Ops {
   };
   'keys.delete': { req: { fingerprint: string }; res: readonly KeyInfo[] };
   'keys.setDefault': { req: { fingerprint: string }; res: readonly KeyInfo[] };
+  /**
+   * Ändert NUR die örtliche Beschriftung, nicht den Schlüssel.
+   *
+   * ⚠️ Der Unterschied ist wesentlich: die User-ID steht unveränderlich im
+   *    öffentlichen Schlüssel und reist mit jeder Kopie mit. Was hier geändert
+   *    wird, sieht ausschliesslich der eigene Schlüsselbund — andere sehen
+   *    weiterhin die User-ID. Die App muss das an der Bedienstelle sagen,
+   *    sonst hält jemand eine örtliche Notiz für eine öffentliche Änderung.
+   */
+  'keys.beschrifte': { req: { fingerprint: string; label: string }; res: readonly KeyInfo[] };
+
+  /**
+   * Vollsicherung: Kontakte und Gesprächsverlauf, an den eigenen Schlüssel
+   * verschlüsselt.
+   *
+   * ⚠️ Ausdrücklich NICHT Teil der Schlüsselsicherung: die ist ein
+   *    OpenPGP-Export für GnuPG. Wer die Browserdaten löscht, bekommt damit
+   *    den Schlüssel zurück — und ohne diese Datei kein einziges Gespräch.
+   */
+  'sicherung.erzeuge': {
+    req: { fingerprint: string };
+    res: { armored: string; filename: string; kontakte: number; nachrichten: number };
+  };
+  'sicherung.spieleEin': {
+    req: { armored: string };
+    res: {
+      kontakteNeu: number; kontakteUebersprungen: number;
+      nachrichtenNeu: number; nachrichtenUebersprungen: number;
+    };
+  };
   'keys.revocationCertificate': { req: { fingerprint: string }; res: { armored: string } };
   'keys.applyRevocation': { req: { armored: string }; res: KeyInfo };
 

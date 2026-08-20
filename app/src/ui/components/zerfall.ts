@@ -10,9 +10,16 @@
  *     Ergebnis steht sofort im DOM; die Bewegung läuft darüber und ist rein
  *     kosmetisch. Ein Test hält fest, dass der Text auch ohne Animation
  *     vollständig da ist.
- *  2. **Höchstens `MAX_ZEICHEN` Spans.** Ein 40-kB-Text ergäbe sonst 40.000
- *     DOM-Knoten, und aus der Eleganz würde ein Ruckler. Der Rest blendet
- *     als Ganzes über.
+ *  2. **Höchstens `MAX_KNOTEN` bewegte Elemente.** Ein 40-kB-Text ergäbe sonst
+ *     40.000 DOM-Knoten, und aus der Eleganz würde ein Ruckler.
+ *
+ *     ⚠️ Früher hiess das: nur die ersten 300 Zeichen bewegten sich, der Rest
+ *        blendete als Klotz über. Bei einem PGP-Block sind 300 Zeichen die
+ *        ersten drei Zeilen — es sah aus, als sei die Animation kaputt.
+ *        Jetzt bewegt sich der GANZE Text: bis zum Knotenbudget Zeichen für
+ *        Zeichen, darüber in Stücken, die als Einheit fliegen. Ein 40-kB-Text
+ *        bekommt so rund 1200 Stücke statt 40.000 Zeichen — und bewegt sich
+ *        vollständig.
  *  3. **`prefers-reduced-motion` schaltet sie vollständig ab** — nicht nur die
  *     auffälligen Teile.
  *
@@ -25,11 +32,36 @@
 import { Feder, ruhigeDarstellung } from '../../motion/spring.ts';
 import { el } from '../dom.ts';
 
-export const MAX_ZEICHEN = 300;
-/** Gesamtdauer bleibt unter dieser Marke — sonst nervt es beim zweiten Mal. */
-export const MAX_DAUER_MS = 400;
+/**
+ * Wie viele Elemente höchstens bewegt werden.
+ *
+ * Nicht die Textlänge — die ist unbegrenzt. Bei mehr Zeichen als Knoten fasst
+ * ein Knoten mehrere Zeichen zusammen und fliegt als Einheit.
+ */
+export const MAX_KNOTEN = 1200;
+
+/**
+ * Gesamtdauer.
+ *
+ * ⚠️ Waren 400 ms — für einen Block über viele Zeilen zu kurz, um überhaupt
+ *    als Bewegung wahrgenommen zu werden. Länger darf es sein, weil man das
+ *    Ergebnis ohnehin liest; nur nicht so lang, dass man wartet.
+ */
+export const MAX_DAUER_MS = 1400;
+
+/** Ab wann ein Zeichen ein eigener Knoten bleibt (darunter reicht es immer). */
+export const MAX_ZEICHEN = MAX_KNOTEN;
 
 export type Richtung = 'zerfall' | 'aufbau';
+
+/**
+ * Wie viel der Gesamtdauer auf den Versatz entfällt.
+ *
+ * Bei 0 bewegte sich alles gleichzeitig, bei 1 wäre das letzte Stück erst am
+ * Ende überhaupt in Bewegung. 0,72 gibt eine deutlich sichtbare Welle durch
+ * den ganzen Block (vorher 0,55, was bei drei Zeilen kaum auffiel).
+ */
+const WELLE = 0.72;
 
 interface Zeichen {
   readonly knoten: HTMLElement;
@@ -56,46 +88,70 @@ export function zeigeMitZerfall(behaelter: HTMLElement, text: string, richtung: 
     return;
   }
 
-  const sichtbar = text.slice(0, MAX_ZEICHEN);
-  const rest = text.slice(MAX_ZEICHEN);
+  // Wie viele Zeichen fasst ein bewegtes Stück? Bei kurzem Text: eines.
+  const proStueck = Math.max(1, Math.ceil(text.length / MAX_KNOTEN));
 
   const zeichen: Zeichen[] = [];
-  for (let i = 0; i < sichtbar.length; i++) {
-    const c = sichtbar[i] ?? '';
-    if (c === '\n') { behaelter.appendChild(document.createElement('br')); continue; }
-    const knoten = el('span', { class: 'zf' });
-    knoten.textContent = c;
-    behaelter.appendChild(knoten);
-    zeichen.push({
-      knoten,
-      versatz: (i / Math.max(1, sichtbar.length - 1)) * 0.55,
-      // Streuung aus dem Zeichenwert statt aus Zufall: derselbe Text zerfällt
-      // immer gleich, das wirkt wie Material und nicht wie Flimmern.
-      streuX: ((c.charCodeAt(0) * 37) % 21) - 10,
-      streuY: ((c.charCodeAt(0) * 61) % 17) - 8,
-      drehung: ((c.charCodeAt(0) * 13) % 15) - 7,
-    });
-  }
-  if (rest.length > 0) {
-    const schwanz = el('span', { class: 'zf-rest' });
-    schwanz.textContent = rest;
-    behaelter.appendChild(schwanz);
+  // Zeilenweise, damit die Umbrüche <br> bleiben und ein Stück nie über eine
+  // Zeilengrenze hinweg fliegt — das sähe aus wie ein Textfehler.
+  const zeilen = text.split('\n');
+  let gesehen = 0;
+  for (let z = 0; z < zeilen.length; z++) {
+    const zeile = zeilen[z] ?? '';
+    for (let i = 0; i < zeile.length; i += proStueck) {
+      const stueck = zeile.slice(i, i + proStueck);
+      const knoten = el('span', { class: 'zf' });
+      knoten.textContent = stueck;
+      behaelter.appendChild(knoten);
+      const c = stueck.charCodeAt(0);
+      zeichen.push({
+        knoten,
+        // Der Versatz folgt der Stelle im GESAMTEN Text, nicht der Stückzahl —
+        // so läuft die Welle gleichmässig durch den Block.
+        // ⚠️ Die Richtung tat vorher NICHTS: dort stand
+        //    `richtung === 'zerfall' ? 1 - p : 1 - p` — zwei identische
+        //    Zweige. Zerfall und Aufbau sahen gleich aus, obwohl die Doku
+        //    seit Phase 2 einen Unterschied verspricht. Jetzt läuft die Welle
+        //    beim Verschlüsseln von oben nach unten (der Klartext zerfällt in
+        //    den Block) und beim Entschlüsseln von unten nach oben (der Text
+        //    setzt sich zusammen).
+        versatz: (richtung === 'zerfall'
+          ? gesehen / Math.max(1, text.length)
+          : 1 - gesehen / Math.max(1, text.length)) * WELLE,
+        // Streuung aus dem Zeichenwert statt aus Zufall: derselbe Text zerfällt
+        // immer gleich, das wirkt wie Material und nicht wie Flimmern.
+        streuX: ((c * 37) % 53) - 26,
+        streuY: ((c * 61) % 37) - 18,
+        // Zerfall ist unordentlich, Aufbau ordentlich: beim Zusammensetzen
+        // drehen sich die Stücke kaum, sie rasten ein.
+        drehung: (((c * 13) % 29) - 14) * (richtung === 'zerfall' ? 1 : 0.35),
+      });
+      gesehen += stueck.length;
+    }
+    if (z < zeilen.length - 1) {
+      behaelter.appendChild(document.createElement('br'));
+      gesehen += 1;
+    }
   }
 
   const feder = new Feder(
     (wert) => {
       for (const z of zeichen) {
-        const p = klemme((wert - z.versatz) / (1 - 0.55));
+        const p = klemme((wert - z.versatz) / (1 - WELLE));
         // zerfall: von gestreut nach ruhig. aufbau: dieselbe Bewegung, nur wird
         // dabei zusammengesetzt statt auseinandergenommen.
-        const g = richtung === 'zerfall' ? 1 - p : 1 - p;
-        z.knoten.style.opacity = String(0.15 + 0.85 * p);
+        const g = 1 - p;
+        // Von 0 statt von 0,15: das Stück kommt aus dem Nichts, statt schon
+        // blass dazustehen — der Unterschied zwischen „bewegt sich" und
+        // „erscheint".
+        z.knoten.style.opacity = String(p);
         z.knoten.style.transform =
           `translate(${String(z.streuX * g)}px, ${String(z.streuY * g)}px) ` +
-          `rotate(${String(z.drehung * g)}deg) scale(${String(0.86 + 0.14 * p)})`;
+          `rotate(${String(z.drehung * g)}deg) scale(${String(0.62 + 0.38 * p)})`;
       }
     },
-    { art: 'knapp', start: 0 },
+    // `weich` statt `knapp`: die Bewegung soll tragen, nicht zucken.
+    { art: 'weich', start: 0 },
   );
   feder.ziel(1);
 

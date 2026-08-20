@@ -79,6 +79,12 @@ async function fuehreAus(anfrage: AnyRequest): Promise<unknown> {
       return await vault.loesche(anfrage.fingerprint);
     case 'keys.setDefault':
       return await vault.setzeStandard(anfrage.fingerprint);
+    case 'sicherung.erzeuge':
+      return await vault.sicherungErzeuge(anfrage.fingerprint);
+    case 'sicherung.spieleEin':
+      return await vault.sicherungSpieleEin(anfrage.armored);
+    case 'keys.beschrifte':
+      return await vault.beschrifte(anfrage.fingerprint, anfrage.label);
     case 'keys.revocationCertificate':
       return { armored: await vault.widerrufszertifikat(anfrage.fingerprint) };
     case 'keys.applyRevocation':

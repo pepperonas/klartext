@@ -421,6 +421,72 @@ Die Lehre ist nicht „mehr mutieren", sondern: **die Probe muss die Eigenschaft
 treffen, die der Test behauptet** — und der Test darf seinen Gegenstand nicht
 selbst herstellen.
 
+## Namen ändern, und was dabei örtlich bleibt
+
+Eigene Schlüssel und Kontakte lassen sich umbenennen — **örtlich**. Die
+User-ID steht unveränderlich im öffentlichen Schlüssel und reist mit jeder
+Kopie mit; was hier geändert wird, sieht nur der eigene Schlüsselbund. Die
+Schlüsselkarte zeigt deshalb beides: den eigenen Namen als Überschrift und
+darunter „Andere sehen: …", sobald es abweicht.
+
+⚠️ Zwei Befunde dabei: die Karte zeigte `userIds[0] ?? label` — die
+Beschriftung wurde also nie angezeigt, solange es eine User-ID gab, und eine
+Umbenennung wäre unsichtbar geblieben. Und `kontakte.umbenennen` lag seit
+Phase 3 fertig und getestet im Worker, **ohne dass eine Ansicht es aufrief**:
+eine gebaute Fähigkeit, die niemand erreichen kann.
+
+## Die Schlüsselsicherung enthält keine Gespräche
+
+Sie ist ein OpenPGP-Export, damit GnuPG sie lesen kann — also nur der
+Schlüssel. Wer die Browserdaten löscht, bekommt damit den Schlüssel zurück und
+**kein einziges Gespräch**. Der Relay kann das nicht auffangen (nur Ciphertext,
+sieben Tage).
+
+Dafür gibt es jetzt `worker/sicherung.ts`: Kontakte und Verlauf als eigene
+Datei, **an den eigenen Schlüssel verschlüsselt** — ohne ihn ist sie ein Haufen
+Zufall. Sie **ergänzt beim Einspielen und ersetzt nie**: eine alte Sicherung
+darf keinen neueren Kontakt zurückdrehen und keine Vertrauensmarkierung
+verlieren. Der Verlauf wandert wörtlich als Ciphertext hinein, wird also nicht
+entschlüsselt und neu verschlüsselt.
+
+⚠️ Sie steht bewusst in den Einstellungen und nicht neben der
+Schlüsselsicherung — sonst hält jemand seine Gespräche für gesichert, weil er
+„eine Sicherung" hat.
+
+## Eine Einladung geht nur in EINE Richtung
+
+Sie trägt den Schlüssel dessen, der sie schickt. Wer sie annimmt, sieht den
+Absender — der Absender sieht ihn deswegen **nicht**. Gemeldet als „der neue
+Kontakt sieht mich, aber ich sehe ihn nicht": kein Fehler, aber es stand
+nirgends. Beide Schirme sagen es jetzt, und nach dem Aufnehmen bietet die App
+die Gegeneinladung direkt an, statt wortlos in die Liste zu springen.
+
+**RSA und Curve25519 vertragen sich vollständig** — mit echtem gpg in beide
+Richtungen geprüft, inklusive Signaturen und einer Nachricht an beide zugleich
+(zwei Empfänger-Pakete in einem Block). Das Verfahren gehört zum Schlüssel, nicht
+zur Verbindung.
+
+## Der ganze Text bewegt sich, nicht nur der Anfang
+
+`MAX_ZEICHEN = 300` hiess: bei einem PGP-Block bewegten sich die ersten drei
+Zeilen, der Rest blendete als Klotz über — für den Betrachter sah das aus, als
+sei die Animation kaputt (so gemeldet).
+
+Der Deckel war trotzdem richtig gedacht: 40.000 Spans für einen 40-kB-Text sind
+ein Ruckler. Er begrenzt jetzt die **Knoten** (`MAX_KNOTEN = 1200`), nicht den
+Text: bis zum Budget ein Knoten je Zeichen, darüber fasst ein Knoten mehrere
+Zeichen zusammen und fliegt als Einheit. Ein 40-kB-Text bewegt sich damit
+vollständig. Dauer 400 → 1400 ms, Streuung und Drehung rund verdoppelt,
+Deckkraft ab 0 statt 0,15. Im Browser gemessen: 656 von 656 Zeichen in
+Bewegung, kein unbewegter Rest.
+
+⚠️ Dabei ein alter Fund: dort stand `richtung === 'zerfall' ? 1 - p : 1 - p` —
+**zwei identische Zweige**. Die Richtung tat nie etwas, obwohl die Doku seit
+Phase 2 einen Unterschied verspricht. Beide Fälle sahen für sich richtig aus,
+deshalb fiel es nie auf. Jetzt läuft die Welle beim Verschlüsseln von oben nach
+unten und beim Entschlüsseln von unten nach oben, und der Aufbau dreht die
+Stücke kaum — er rastet ein, statt zu zerfallen.
+
 ## Fallstricke, die schon zugeschnappt sind
 
 **GnuPG-Eigenheiten beim Einfügen.** Ein `.rev`-Widerrufszertifikat von gpg
